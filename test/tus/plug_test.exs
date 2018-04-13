@@ -36,10 +36,15 @@ defmodule Tus.Test.PlugTest do
 
   describe "PATCH" do
     test "happy path" do
+      # fixture
+      filename = "patch.random"
+      tmp_file(filename) |> File.touch!()
+
       body = "yadda"
 
       newconn =
-        conn(:patch, "#{upload_baseurl()}/patch.random", body)
+        conn(:patch, "#{upload_baseurl()}/#{filename}", body)
+        |> put_req_header("upload-offset", "0")
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-tye", "application/offset+octet-stream")
 
@@ -48,8 +53,59 @@ defmodule Tus.Test.PlugTest do
 
       assert {204, _headers, _body} = sent_resp(newconn)
 
-      assert_upload_offset(newconn, byte_size(body))
+      assert_upload_offset(newconn, byte_size(body) |> to_string())
       assert_tus_resumable(newconn)
+
+      tmp_file(filename) |> File.rm!()
+    end
+
+    test "multiple requests" do
+      # fixture
+      filename = "patch.random"
+      tmp_file(filename) |> File.touch!()
+
+      upload_fn = fn body, offset ->
+        newconn =
+          conn(:patch, "#{upload_baseurl()}/#{filename}", body)
+          |> put_req_header("upload-offset", offset)
+          |> put_req_header("tus-resumable", "1.0.0")
+          |> put_req_header("content-tye", "application/offset+octet-stream")
+
+        opts = TusPlug.init([])
+        newconn = newconn |> TusPlug.call(opts)
+
+        assert {204, _headers, _body} = sent_resp(newconn)
+        {:ok, newconn}
+      end
+
+      # first segment
+      body = "yadda"
+
+      {:ok, _} = upload_fn.(body, "0")
+
+      # 2nd segment
+      body2 = "baz"
+
+      {:ok, newconn2} = upload_fn.(body2, "5")
+
+      # checks
+      assert_upload_offset(newconn2, byte_size(body <> body2) |> to_string())
+      assert_tus_resumable(newconn2)
+
+      tmp_file(filename) |> File.rm!()
+    end
+
+    test "file does not exists" do
+      newconn =
+        conn(:patch, "#{upload_baseurl()}/notfound", "body")
+        |> put_req_header("upload-offset", "0")
+        |> put_req_header("tus-resumable", "1.0.0")
+        |> put_req_header("content-tye", "application/offset+octet-stream")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {404, _headers, _body} = sent_resp(newconn)
     end
   end
 
@@ -66,7 +122,12 @@ defmodule Tus.Test.PlugTest do
       assert {204, _headers, _body} = sent_resp(newconn)
       assert_tus_resumable(newconn)
       assert_tus_version(newconn)
+      assert_tus_extensions(newconn)
     end
+  end
+
+  def assert_tus_extensions(conn) do
+    assert "creation" = get_header(conn, "tus-extension")
   end
 
   defp assert_cache_control(conn) do
@@ -103,5 +164,11 @@ defmodule Tus.Test.PlugTest do
 
   defp upload_baseurl do
     TusPlug.upload_baseurl()
+  end
+
+  defp tmp_file(filename) do
+    Application.get_env(:tus, Tus.Plug)
+    |> Keyword.get(:upload_path)
+    |> Path.join(filename)
   end
 end

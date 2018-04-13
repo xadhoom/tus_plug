@@ -16,7 +16,8 @@ defmodule Tus.Plug do
   def call(%{method: "OPTIONS"} = conn, opts) do
     with {:ok, conn} <- check_path(conn, opts) do
       conn
-      |> put_resp_header("tus-version", version())
+      |> add_version_h()
+      |> add_extensions_h()
       |> resp(:no_content, "")
     else
       {:error, :nomatch} ->
@@ -93,7 +94,8 @@ defmodule Tus.Plug do
   defp do_response(%{state: :set} = conn) do
     conn
     |> put_resp_header("tus-resumable", version())
-    |> put_resp_header("tus-version", version())
+    |> add_version_h()
+    |> add_extensions_h()
     |> halt()
     |> send_resp()
   end
@@ -167,5 +169,19 @@ defmodule Tus.Plug do
     path_info
     |> Enum.take(-1)
     |> filename()
+  end
+
+  defp add_version_h(conn) do
+    conn
+    |> put_resp_header("tus-version", version())
+  end
+
+  defp add_extensions_h(conn) do
+    conn
+    |> put_resp_header("tus-extension", extensions())
+  end
+
+  defp extensions do
+    "creation"
   end
 end

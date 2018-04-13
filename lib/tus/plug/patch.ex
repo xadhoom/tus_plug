@@ -2,6 +2,9 @@ defmodule Tus.Plug.PATCH do
   @moduledoc false
   import Plug.Conn
 
+  @max_body_read Application.get_env(:tus, Tus.Plug) |> Keyword.get(:max_body_read)
+  @body_read_len Application.get_env(:tus, Tus.Plug) |> Keyword.get(:body_read_len)
+
   def call(%{method: "PATCH"} = conn, opts) do
     path =
       conn.private[:filename]
@@ -9,9 +12,10 @@ defmodule Tus.Plug.PATCH do
 
     with {:ok, offset} <- get_offset(conn),
          :ok <- check_offset(path, offset),
+         {:ok, _} <- File.stat(path),
          {:ok, fd} <- File.open(path, [:append]) do
       conn
-      |> read_body()
+      |> read_body(length: @max_body_read, read_length: @body_read_len)
       |> write_data({conn, offset, fd, opts})
     else
       {:error, :offset} ->
@@ -22,6 +26,9 @@ defmodule Tus.Plug.PATCH do
 
       {:error, :offset_conflict} ->
         conn |> resp(:conflict, "")
+
+      {:error, :enoent} ->
+        conn |> resp(:not_found, "")
 
       {:error, _} ->
         conn
@@ -40,7 +47,7 @@ defmodule Tus.Plug.PATCH do
     new_offset = File.stat!(path) |> Map.get(:size)
 
     conn
-    |> put_resp_header("upload-offset", new_offset)
+    |> put_resp_header("upload-offset", to_string(new_offset))
     |> resp(:no_content, "")
   end
 
@@ -48,7 +55,7 @@ defmodule Tus.Plug.PATCH do
     :ok = IO.binwrite(fd, data)
 
     conn
-    |> read_body()
+    |> read_body(length: @max_body_read, read_length: @body_read_len)
     |> write_data({conn, offset, fd, opts})
   end
 
@@ -80,7 +87,7 @@ defmodule Tus.Plug.PATCH do
     Path.join(opts.upload_path, filename)
   end
 
-  defp check_offset(path, 0) do
+  defp check_offset(_path, 0) do
     :ok
   end
 
