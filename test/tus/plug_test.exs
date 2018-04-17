@@ -134,6 +134,80 @@ defmodule Tus.Test.PlugTest do
   end
 
   describe "POST" do
+    test "happy path" do
+      newconn =
+        conn(:post, "#{upload_baseurl()}")
+        |> put_req_header("upload-length", "42")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {201, _headers, _body} = sent_resp(newconn)
+
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
+      assert_tus_location(newconn)
+    end
+
+    test "wrong path" do
+      newconn =
+        conn(:post, "#{upload_baseurl()}/foo")
+        |> put_req_header("upload-length", "42")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {404, _headers, _body} = sent_resp(newconn)
+
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
+    end
+
+    test "missing upload-length" do
+      newconn =
+        conn(:post, "#{upload_baseurl()}")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {412, _headers, _body} = sent_resp(newconn)
+
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
+    end
+
+    test "413 too large" do
+      assert false
+    end
+
+    test "with metadata" do
+      postconn =
+        conn(:post, "#{upload_baseurl()}")
+        |> put_req_header("upload-length", "42")
+        |> put_req_header("upload-metadata", gen_metadata())
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      postconn = postconn |> TusPlug.call(opts)
+
+      assert {201, _headers, _body} = sent_resp(postconn)
+
+      loc = get_header(postconn, "location")
+
+      headconn =
+        conn(:head, loc)
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      headconn = headconn |> TusPlug.call(opts)
+      assert {200, _headers, _body} = sent_resp(headconn)
+
+      assert metadata = get_header(headconn, "upload-metadata")
+      assert metadata == "foo"
+    end
   end
 
   describe "OPTIONS" do
@@ -148,6 +222,10 @@ defmodule Tus.Test.PlugTest do
       assert_tus_version(newconn)
       assert_tus_extensions(newconn)
     end
+  end
+
+  defp assert_tus_location(conn) do
+    assert get_header(conn, "location") =~ ~r/#{upload_baseurl()}\/[a-z|0-9]{32}$/
   end
 
   defp assert_tus_extensions(conn) do
@@ -197,7 +275,7 @@ defmodule Tus.Test.PlugTest do
     |> Path.join(filename)
   end
 
-  def upload_chunk(filename, data, offset) do
+  defp upload_chunk(filename, data, offset) do
     newconn =
       conn(:patch, "#{upload_baseurl()}/#{filename}", data)
       |> put_req_header("upload-offset", offset)
@@ -209,5 +287,14 @@ defmodule Tus.Test.PlugTest do
 
     res = sent_resp(newconn)
     {:ok, newconn, res}
+  end
+
+  defp gen_metadata do
+    [{"foo", "bar"}, {"bar", "baz"}]
+    |> Enum.map(fn {key, value} ->
+      b64value = Base.encode64(value)
+      "#{key} #{b64value}"
+    end)
+    |> Enum.join(" ")
   end
 end

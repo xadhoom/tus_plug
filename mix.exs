@@ -20,13 +20,15 @@ defmodule Tus.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {Tus.Application, []}
     ]
   end
 
   defp deps do
     [
       {:plug, "~> 1.5"},
+      {:persistent_ets, "~> 0.1"},
       # development stuff
       {:excoveralls, "~> 0.8", only: :test, runtime: false},
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},

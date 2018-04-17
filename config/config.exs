@@ -7,4 +7,8 @@ config :tus, Tus.Plug,
   max_body_read: 8_000_000,
   body_read_len: 1_000_000
 
+config :tus, Tus.Plug.Cache,
+  persistence_path: "/tmp",
+  ets_backend: PersistentEts
+
 import_config "#{Mix.env()}.exs"

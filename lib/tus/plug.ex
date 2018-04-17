@@ -4,7 +4,7 @@ defmodule Tus.Plug do
   """
   import Plug.Conn
 
-  alias Tus.Plug.{HEAD, PATCH}
+  alias Tus.Plug.{HEAD, PATCH, POST}
 
   def init(_opts) do
     %{
@@ -59,6 +59,25 @@ defmodule Tus.Plug do
       {:error, :nofile} ->
         conn
         |> resp(:bad_request, "")
+
+      {:error, :precondition} ->
+        conn |> resp(:precondition_failed, "")
+    end
+    |> do_response()
+  end
+
+  def call(%{method: "POST"} = conn, opts) do
+    with {:ok, conn} <- check_path(conn, opts),
+         {:ok, conn} <- preconditions(conn, opts),
+         {:error, _} <- extract_filename(conn, opts) do
+      conn
+      |> POST.call(opts)
+    else
+      {:error, :nomatch} ->
+        conn
+
+      {:ok, _} ->
+        conn |> resp(:not_found, "")
 
       {:error, :precondition} ->
         conn |> resp(:precondition_failed, "")
@@ -134,11 +153,16 @@ defmodule Tus.Plug do
     end
   end
 
-  defp extract_filename(conn, _opts) do
+  defp extract_filename(conn, opts) do
+    baseurl = basepath(conn.path_info) |> Enum.join()
+
     conn.path_info
     |> filename()
     |> case do
       nil ->
+        {:error, :nofile}
+
+      ^baseurl ->
         {:error, :nofile}
 
       filen ->
