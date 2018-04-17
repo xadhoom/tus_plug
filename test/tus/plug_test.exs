@@ -79,6 +79,7 @@ defmodule Tus.Test.PlugTest do
       # checks
       assert_upload_offset(newconn2, byte_size(body <> body2) |> to_string())
       assert_tus_resumable(newconn2)
+      assert body <> body2 == File.read!(tmp_file(filename))
 
       tmp_file(filename) |> File.rm!()
     end
