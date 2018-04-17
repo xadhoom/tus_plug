@@ -2,8 +2,10 @@ defmodule Tus.Plug.PATCH do
   @moduledoc false
   import Plug.Conn
 
-  @max_body_read Application.get_env(:tus, Tus.Plug) |> Keyword.get(:max_body_read)
-  @body_read_len Application.get_env(:tus, Tus.Plug) |> Keyword.get(:body_read_len)
+  @max_body_read Application.get_env(:tus, Tus.Plug)
+                 |> Keyword.get(:max_body_read)
+  @body_read_len Application.get_env(:tus, Tus.Plug)
+                 |> Keyword.get(:body_read_len)
 
   def call(%{method: "PATCH"} = conn, opts) do
     path =
@@ -36,7 +38,7 @@ defmodule Tus.Plug.PATCH do
     end
   end
 
-  defp write_data({:ok, data, conn}, {_, offset, fd, opts}) do
+  defp write_data({:ok, data, conn}, {_, _offset, fd, opts}) do
     :ok = IO.binwrite(fd, data)
     File.close(fd)
 
