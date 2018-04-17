@@ -30,7 +30,14 @@ defmodule Tus.Test.PlugTest do
     end
 
     test "file not found" do
-      assert false
+      newconn =
+        conn(:head, "#{upload_baseurl()}/yadda.gz")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {404, _headers, _body} = sent_resp(newconn)
     end
   end
 
