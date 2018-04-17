@@ -27,6 +27,7 @@ defmodule Tus.Test.PlugTest do
       assert_upload_offset(newconn)
       assert_cache_control(newconn)
       assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
     end
 
     test "file not found" do
@@ -38,13 +39,17 @@ defmodule Tus.Test.PlugTest do
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
+
+      assert_cache_control(newconn)
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
     end
   end
 
   describe "PATCH" do
     test "happy path" do
       # fixture
-      filename = "patch.random"
+      filename = "patch.happy"
       tmp_file(filename) |> File.touch!()
 
       body = "yadda"
@@ -62,13 +67,14 @@ defmodule Tus.Test.PlugTest do
 
       assert_upload_offset(newconn, byte_size(body) |> to_string())
       assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
 
       tmp_file(filename) |> File.rm!()
     end
 
     test "multiple requests" do
       # fixture
-      filename = "patch.random"
+      filename = "patch.multiple"
       tmp_file(filename) |> File.touch!()
 
       # first segment
@@ -85,8 +91,9 @@ defmodule Tus.Test.PlugTest do
 
       # checks
       assert_upload_offset(newconn2, byte_size(body <> body2) |> to_string())
-      assert_tus_resumable(newconn2)
       assert body <> body2 == File.read!(tmp_file(filename))
+      assert_tus_resumable(newconn2)
+      assert_tus_extensions(newconn2)
 
       tmp_file(filename) |> File.rm!()
     end
@@ -102,6 +109,9 @@ defmodule Tus.Test.PlugTest do
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
+
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
     end
 
     test "conflict" do
@@ -112,12 +122,14 @@ defmodule Tus.Test.PlugTest do
       {:ok, _, _} = upload_chunk(filename, "somedata", "0")
 
       # overlapping
-      {:ok, _, res} = upload_chunk(filename, "dataother", "5")
+      {:ok, newconn2, res} = upload_chunk(filename, "dataother", "5")
 
       # assert conflict
       assert {409, _headers, _body} = res
 
       tmp_file(filename) |> File.rm!()
+      assert_tus_resumable(newconn2)
+      assert_tus_extensions(newconn2)
     end
   end
 
@@ -138,8 +150,9 @@ defmodule Tus.Test.PlugTest do
     end
   end
 
-  def assert_tus_extensions(conn) do
-    assert "creation" = get_header(conn, "tus-extension")
+  defp assert_tus_extensions(conn) do
+    extensions = ["creation"] |> Enum.join(",")
+    assert extensions == get_header(conn, "tus-extension")
   end
 
   defp assert_cache_control(conn) do
