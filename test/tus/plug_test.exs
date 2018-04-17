@@ -64,29 +64,17 @@ defmodule Tus.Test.PlugTest do
       filename = "patch.random"
       tmp_file(filename) |> File.touch!()
 
-      upload_fn = fn body, offset ->
-        newconn =
-          conn(:patch, "#{upload_baseurl()}/#{filename}", body)
-          |> put_req_header("upload-offset", offset)
-          |> put_req_header("tus-resumable", "1.0.0")
-          |> put_req_header("content-tye", "application/offset+octet-stream")
-
-        opts = TusPlug.init([])
-        newconn = newconn |> TusPlug.call(opts)
-
-        assert {204, _headers, _body} = sent_resp(newconn)
-        {:ok, newconn}
-      end
-
       # first segment
       body = "yadda"
 
-      {:ok, _} = upload_fn.(body, "0")
+      {:ok, _, res} = upload_chunk(filename, body, "0")
+      assert {204, _headers, _body} = res
 
       # 2nd segment
       body2 = "baz"
 
-      {:ok, newconn2} = upload_fn.(body2, "5")
+      {:ok, newconn2, res} = upload_chunk(filename, body2, "5")
+      assert {204, _headers, _body} = res
 
       # checks
       assert_upload_offset(newconn2, byte_size(body <> body2) |> to_string())
@@ -106,6 +94,22 @@ defmodule Tus.Test.PlugTest do
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
+    end
+
+    test "conflict" do
+      # fixture
+      filename = "patch.conflict"
+      tmp_file(filename) |> File.touch!()
+
+      {:ok, _, _} = upload_chunk(filename, "somedata", "0")
+
+      # overlapping
+      {:ok, _, res} = upload_chunk(filename, "dataother", "5")
+
+      # assert conflict
+      assert {409, _headers, _body} = res
+
+      tmp_file(filename) |> File.rm!()
     end
   end
 
@@ -170,5 +174,19 @@ defmodule Tus.Test.PlugTest do
     Application.get_env(:tus, Tus.Plug)
     |> Keyword.get(:upload_path)
     |> Path.join(filename)
+  end
+
+  def upload_chunk(filename, data, offset) do
+    newconn =
+      conn(:patch, "#{upload_baseurl()}/#{filename}", data)
+      |> put_req_header("upload-offset", offset)
+      |> put_req_header("tus-resumable", "1.0.0")
+      |> put_req_header("content-tye", "application/offset+octet-stream")
+
+    opts = TusPlug.init([])
+    newconn = newconn |> TusPlug.call(opts)
+
+    res = sent_resp(newconn)
+    {:ok, newconn, res}
   end
 end
