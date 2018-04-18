@@ -55,9 +55,6 @@ defmodule Tus.Test.PlugTest do
       assert_cache_control(newconn)
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
-
-      # cleanup
-      tmp_file("stuff") |> File.rm!()
     end
 
     test "file not found" do
@@ -80,7 +77,7 @@ defmodule Tus.Test.PlugTest do
     test "happy path" do
       # fixture
       filename = "patch.happy"
-      tmp_file(filename) |> File.touch!()
+      filename |> tmp_file() |> File.touch!()
 
       body = "yadda"
 
@@ -95,17 +92,15 @@ defmodule Tus.Test.PlugTest do
 
       assert {204, _headers, _body} = sent_resp(newconn)
 
-      assert_upload_offset(newconn, byte_size(body) |> to_string())
+      assert_upload_offset(newconn, body |> byte_size() |> to_string())
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
-
-      tmp_file(filename) |> File.rm!()
     end
 
     test "multiple requests" do
       # fixture
       filename = "patch.multiple"
-      tmp_file(filename) |> File.touch!()
+      filename |> tmp_file() |> File.touch!()
 
       # first segment
       body = "yadda"
@@ -120,12 +115,10 @@ defmodule Tus.Test.PlugTest do
       assert {204, _headers, _body} = res
 
       # checks
-      assert_upload_offset(newconn2, byte_size(body <> body2) |> to_string())
+      assert_upload_offset(newconn2, (body <> body2) |> byte_size() |> to_string())
       assert body <> body2 == File.read!(tmp_file(filename))
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
-
-      tmp_file(filename) |> File.rm!()
     end
 
     test "file does not exists" do
@@ -147,7 +140,7 @@ defmodule Tus.Test.PlugTest do
     test "conflict" do
       # fixture
       filename = "patch.conflict"
-      tmp_file(filename) |> File.touch!()
+      filename |> tmp_file() |> File.touch!()
 
       {:ok, _, _} = upload_chunk(filename, "somedata", "0")
 
@@ -157,7 +150,6 @@ defmodule Tus.Test.PlugTest do
       # assert conflict
       assert {409, _headers, _body} = res
 
-      tmp_file(filename) |> File.rm!()
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
     end

@@ -125,7 +125,8 @@ defmodule Tus.Plug.POST do
   defp parse_upload_len([v]), do: parse_upload_len(v)
 
   defp parse_upload_len(v) when is_binary(v) do
-    String.to_integer(v)
+    v
+    |> String.to_integer()
     |> parse_upload_len()
   end
 

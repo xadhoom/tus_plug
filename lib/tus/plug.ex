@@ -155,7 +155,7 @@ defmodule Tus.Plug do
   end
 
   defp extract_filename(conn, _opts) do
-    baseurl = basepath(conn.path_info) |> Enum.join()
+    baseurl = conn.path_info |> basepath() |> Enum.join()
 
     conn.path_info
     |> filename()

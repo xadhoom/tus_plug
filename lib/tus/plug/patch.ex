@@ -46,7 +46,7 @@ defmodule Tus.Plug.PATCH do
       conn.private[:filename]
       |> filepath(opts)
 
-    new_offset = File.stat!(path) |> Map.get(:size)
+    new_offset = path |> File.stat!() |> Map.get(:size)
 
     conn
     |> put_resp_header("upload-offset", to_string(new_offset))
@@ -77,7 +77,8 @@ defmodule Tus.Plug.PATCH do
   defp parse_offset([v]), do: parse_offset(v)
 
   defp parse_offset(v) when is_binary(v) do
-    String.to_integer(v)
+    v
+    |> String.to_integer()
     |> parse_offset()
   end
 
