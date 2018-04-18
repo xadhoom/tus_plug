@@ -6,6 +6,25 @@ defmodule Tus.Test.PlugTest do
 
   alias Tus.Plug, as: TusPlug
 
+  setup_all do
+    on_exit(fn ->
+      path =
+        Application.get_env(:tus, Tus.Plug)
+        |> Keyword.get(:upload_path)
+
+      path
+      |> File.ls!()
+      |> Enum.filter(fn file -> file != ".gitignore" end)
+      |> Enum.each(fn file ->
+        path
+        |> Path.join(file)
+        |> File.rm!()
+      end)
+    end)
+
+    :ok
+  end
+
   test "not matching path just returns conn" do
     c = conn(:get, "/foo/var")
     conn = TusPlug.call(c, TusPlug.init([]))
@@ -15,8 +34,16 @@ defmodule Tus.Test.PlugTest do
 
   describe "HEAD" do
     test "happy path" do
+      # fixture
+      # create an entry into the cache
+      alias Tus.Plug.Cache
+      alias Tus.Plug.Cache.Entry
+      tmp_file("stuff") |> File.touch!()
+      entry = %Entry{id: "stuff", filename: "stuff", started_at: DateTime.utc_now(), size: 42}
+      :ok = Cache.put(entry)
+      # test
       newconn =
-        conn(:head, "#{upload_baseurl()}/stuff.gz")
+        conn(:head, "#{upload_baseurl()}/stuff")
         |> put_req_header("tus-resumable", "1.0.0")
 
       opts = TusPlug.init([])
@@ -28,6 +55,9 @@ defmodule Tus.Test.PlugTest do
       assert_cache_control(newconn)
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+
+      # cleanup
+      tmp_file("stuff") |> File.rm!()
     end
 
     test "file not found" do
@@ -180,10 +210,25 @@ defmodule Tus.Test.PlugTest do
     end
 
     test "413 too large" do
-      assert false
+      len =
+        get_tus_max_size()
+        |> Kernel.+(1)
+
+      newconn =
+        conn(:post, "#{upload_baseurl()}")
+        |> put_req_header("upload-length", "#{len}")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {413, _headers, _body} = sent_resp(newconn)
+      assert_tus_max_size(newconn)
     end
 
     test "with metadata" do
+      alias Tus.Plug.POST
+
       postconn =
         conn(:post, "#{upload_baseurl()}")
         |> put_req_header("upload-length", "42")
@@ -206,7 +251,7 @@ defmodule Tus.Test.PlugTest do
       assert {200, _headers, _body} = sent_resp(headconn)
 
       assert metadata = get_header(headconn, "upload-metadata")
-      assert metadata == "foo"
+      assert {:ok, _} = POST.validate_metadata(metadata)
     end
   end
 
@@ -221,6 +266,7 @@ defmodule Tus.Test.PlugTest do
       assert_tus_resumable(newconn)
       assert_tus_version(newconn)
       assert_tus_extensions(newconn)
+      assert_tus_max_size(newconn)
     end
   end
 
@@ -254,6 +300,17 @@ defmodule Tus.Test.PlugTest do
       0 -> assert offset >= 0
       v -> assert offset == v
     end
+  end
+
+  defp assert_tus_max_size(conn) do
+    max_size = get_tus_max_size() |> to_string()
+    assert max_size == get_header(conn, "tus-max-size")
+  end
+
+  defp get_tus_max_size do
+    :tus
+    |> Application.get_env(Tus.Plug)
+    |> Keyword.get(:max_size)
   end
 
   defp get_header(conn, header) do
@@ -295,6 +352,6 @@ defmodule Tus.Test.PlugTest do
       b64value = Base.encode64(value)
       "#{key} #{b64value}"
     end)
-    |> Enum.join(" ")
+    |> Enum.join(",")
   end
 end

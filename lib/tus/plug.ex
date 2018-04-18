@@ -115,6 +115,7 @@ defmodule Tus.Plug do
     |> put_resp_header("tus-resumable", version())
     |> add_version_h()
     |> add_extensions_h()
+    |> add_max_size_h()
     |> halt()
     |> send_resp()
   end
@@ -153,7 +154,7 @@ defmodule Tus.Plug do
     end
   end
 
-  defp extract_filename(conn, opts) do
+  defp extract_filename(conn, _opts) do
     baseurl = basepath(conn.path_info) |> Enum.join()
 
     conn.path_info
@@ -203,6 +204,16 @@ defmodule Tus.Plug do
   defp add_extensions_h(conn) do
     conn
     |> put_resp_header("tus-extension", extensions())
+  end
+
+  defp add_max_size_h(conn) do
+    max_size =
+      :tus
+      |> Application.get_env(__MODULE__)
+      |> Keyword.get(:max_size)
+
+    conn
+    |> put_resp_header("tus-max-size", to_string(max_size))
   end
 
   defp extensions do

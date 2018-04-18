@@ -42,8 +42,8 @@ defmodule Tus.Plug.Cache do
     res =
       case :ets.lookup(state.cache, file_id) do
         [] -> {:error, :not_found}
-        [{_k, entry}] -> entry
-      end |> IO.inspect
+        [{_k, entry}] -> {:ok, entry}
+      end
 
     {:reply, res, state}
   end

@@ -14,28 +14,12 @@ defmodule Tus.Plug.HEAD do
          {:ok, %{size: size, type: :regular}} <- File.stat(path) do
       conn
       |> put_resp_header("upload-offset", to_string(size))
-      |> put_resp_header("upload-metadata", entry.metadata)
+      |> put_metadata_hdr(entry)
       |> resp(:ok, "")
     else
       {:error, _} ->
         conn
         |> resp(:not_found, "")
-
-      _ ->
-        conn
-        |> resp(:internal_server_error, "")
-    end
-    |> set_cache_control()
-
-    case File.stat(path) do
-      {:error, _} ->
-        conn
-        |> resp(:not_found, "")
-
-      {:ok, %{size: size, type: :regular}} ->
-        conn
-        |> put_resp_header("upload-offset", to_string(size))
-        |> resp(:ok, "")
 
       _ ->
         conn
@@ -51,5 +35,26 @@ defmodule Tus.Plug.HEAD do
 
   defp filepath(filename, opts) do
     Path.join(opts.upload_path, filename)
+  end
+
+  defp put_metadata_hdr(conn, entry) do
+    case encode_metadata(entry.metadata) do
+      nil ->
+        conn
+
+      md ->
+        conn
+        |> put_resp_header("upload-metadata", md)
+    end
+  end
+
+  defp encode_metadata(nil), do: nil
+
+  defp encode_metadata(metadata) do
+    metadata
+    |> Enum.map(fn {k, v} ->
+      "#{k} #{v}"
+    end)
+    |> Enum.join(",")
   end
 end

@@ -5,7 +5,9 @@ config :tus, Tus.Plug,
   upload_path: "/tmp",
   version: "1.0.0",
   max_body_read: 8_000_000,
-  body_read_len: 1_000_000
+  body_read_len: 1_000_000,
+  # 4GByte
+  max_size: 4_294_967_296
 
 config :tus, Tus.Plug.Cache,
   persistence_path: "/tmp",

@@ -6,14 +6,21 @@ defmodule Tus.Plug.POST do
   alias Tus.Plug.Cache.Entry
 
   def call(%{method: "POST"} = conn, opts) do
-    with {:ok, _upload_len} <- get_upload_len(conn),
+    with {:ok, upload_len} <- get_upload_len(conn),
+         :ok <- check_upload_len(upload_len),
          {:ok, location} <- create(conn, opts) do
       conn
       |> put_resp_header("location", location)
       |> resp(:created, "")
     else
+      {:error, :max_size} ->
+        conn |> resp(:request_entity_too_large, "")
+
       {:error, :upload_len} ->
-        conn |> resp(:precondition_failed, "")
+        conn |> resp(:precondition_failed, "missing upload len")
+
+      {:error, :metadata} ->
+        conn |> resp(:precondition_failed, "metadata")
     end
   end
 
@@ -27,11 +34,17 @@ defmodule Tus.Plug.POST do
       |> URI.merge(Path.join(opts.upload_baseurl, fileid))
       |> to_string
 
-    :ok =
-      %Entry{id: fileid, filename: path, size: get_upload_len(conn), metadata: get_metadata(conn)}
-      |> Cache.put()
+    case get_metadata(conn) do
+      {:ok, md} ->
+        :ok =
+          %Entry{id: fileid, filename: path, size: get_upload_len(conn), metadata: md}
+          |> Cache.put()
 
-    {:ok, location}
+        {:ok, location}
+
+      {:error, :metadata} = err ->
+        err
+    end
   end
 
   defp filepath(filename, opts) do
@@ -39,14 +52,67 @@ defmodule Tus.Plug.POST do
   end
 
   defp get_metadata(conn) do
-    conn
-    |> get_req_header("upload-metadata")
-    |> parse_metadata()
+    md =
+      conn
+      |> get_req_header("upload-metadata")
+      |> parse_metadata_hdr()
+
+    case validate_metadata(md) do
+      {:ok, md} -> {:ok, md}
+      {:error, :metadata} -> {:error, :metadata}
+    end
   end
 
-  defp parse_metadata([]), do: nil
+  @doc false
+  def validate_metadata(nil), do: {:ok, nil}
 
-  defp parse_metadata([v]) when is_binary(v), do: v
+  @doc false
+  def validate_metadata(""), do: {:ok, nil}
+
+  @doc false
+  def validate_metadata(metadata) when is_binary(metadata) do
+    split =
+      metadata
+      |> String.trim()
+      |> String.split(",")
+      |> Enum.map(fn kv -> kv |> String.trim() end)
+
+    split
+    |> Enum.all?(fn kv ->
+      kv =~ ~r/^[a-z|A-Z|0-9]+ [a-z|A-Z|0-9|=|\/|\+]+$/
+    end)
+    |> case do
+      false ->
+        {:error, :metadata}
+
+      true ->
+        md =
+          split
+          |> Enum.map(fn kv ->
+            kv
+            |> String.split(" ")
+            |> List.to_tuple()
+          end)
+
+        {:ok, md}
+    end
+  end
+
+  defp check_upload_len(len) when is_integer(len) do
+    hard_len =
+      :tus
+      |> Application.get_env(Tus.Plug, [])
+      |> Keyword.get(:max_size, 4_294_967_296)
+
+    case len do
+      v when v > hard_len -> {:error, :max_size}
+      _ -> :ok
+    end
+  end
+
+  defp parse_metadata_hdr([]), do: nil
+
+  defp parse_metadata_hdr([v]) when is_binary(v), do: v
 
   defp get_upload_len(conn) do
     conn
