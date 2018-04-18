@@ -8,9 +8,10 @@ defmodule TusPlug.POST do
   def call(%{method: "POST"} = conn, opts) do
     with {:ok, upload_len} <- get_upload_len(conn),
          :ok <- check_upload_len(upload_len),
-         {:ok, location} <- create(conn, opts) do
+         {:ok, location, entry} <- create(conn, opts) do
       conn
       |> put_resp_header("location", location)
+      |> TusPlug.add_expires_hdr(entry.expires_at)
       |> resp(:created, "")
     else
       {:error, :max_size} ->
@@ -36,11 +37,17 @@ defmodule TusPlug.POST do
 
     case get_metadata(conn) do
       {:ok, md} ->
-        :ok =
-          %Entry{id: fileid, filename: path, size: get_upload_len(conn), metadata: md}
+        {:ok, entry} =
+          %Entry{
+            id: fileid,
+            filename: path,
+            size: get_upload_len(conn),
+            started_at: DateTime.utc_now(),
+            metadata: md
+          }
           |> Cache.put()
 
-        {:ok, location}
+        {:ok, location, entry}
 
       {:error, :metadata} = err ->
         err

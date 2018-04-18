@@ -149,6 +149,31 @@ defmodule TusPlug.Test do
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
     end
+
+    test "upload expires" do
+      # fixture
+      filename = "patch.multiple"
+      :ok = empty_file_fixture(filename)
+
+      # first segment
+      body = "yadda"
+      {:ok, newconn, res} = upload_chunk(filename, body, "0")
+      assert {204, _headers, _body} = res
+      assert_upload_expires(newconn)
+
+      # this is cheating since I rely on an internal message
+      future =
+        DateTime.utc_now()
+        |> Timex.add(Timex.Duration.from_seconds(10))
+
+      GenServer.whereis(TusPlug.Cache) |> send({:expire_timer, future})
+
+      # 2nd segment
+      body2 = "baz"
+
+      {:ok, _, res} = upload_chunk(filename, body2, "5")
+      assert {404, _headers, _body} = res
+    end
   end
 
   describe "POST" do
@@ -166,6 +191,7 @@ defmodule TusPlug.Test do
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
       assert_tus_location(newconn)
+      assert_upload_expires(newconn)
     end
 
     test "wrong path" do
@@ -263,7 +289,7 @@ defmodule TusPlug.Test do
   end
 
   defp assert_tus_extensions(conn) do
-    extensions = ["creation"] |> Enum.join(",")
+    extensions = ["creation", "expiration"] |> Enum.join(",")
     assert extensions == get_header(conn, "tus-extension")
   end
 
@@ -293,6 +319,10 @@ defmodule TusPlug.Test do
   defp assert_tus_max_size(conn) do
     max_size = get_tus_max_size() |> to_string()
     assert max_size == get_header(conn, "tus-max-size")
+  end
+
+  defp assert_upload_expires(conn) do
+    assert expires = get_header(conn, "upload-expires")
   end
 
   defp get_tus_max_size do
@@ -350,8 +380,10 @@ defmodule TusPlug.Test do
     alias TusPlug.Cache.Entry
     tmp_file(filename) |> File.touch!()
 
-    :ok =
+    {res, _} =
       %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: 42}
       |> Cache.put()
+
+    res
   end
 end

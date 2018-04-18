@@ -110,6 +110,12 @@ defmodule TusPlug do
     |> Keyword.get(:version, "1.0.0")
   end
 
+  @doc false
+  def add_expires_hdr(conn, %DateTime{} = dt) do
+    conn
+    |> put_resp_header("upload-expires", to_string(dt))
+  end
+
   defp do_response(%{state: :set} = conn) do
     conn
     |> put_resp_header("tus-resumable", version())
@@ -217,6 +223,6 @@ defmodule TusPlug do
   end
 
   defp extensions do
-    "creation"
+    "creation,expiration"
   end
 end

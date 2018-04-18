@@ -11,6 +11,7 @@ config :tus_plug, TusPlug,
 
 config :tus_plug, TusPlug.Cache,
   persistence_path: "/tmp",
-  ets_backend: PersistentEts
+  ets_backend: PersistentEts,
+  ttl: 5000
 
 import_config "#{Mix.env()}.exs"

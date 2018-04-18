@@ -57,10 +57,11 @@ defmodule TusPlug.PATCH do
 
     new_offset = path |> File.stat!() |> Map.get(:size)
 
-    :ok = Cache.update(%{entry | offset: new_offset})
+    {:ok, new_entry} = Cache.update(%{entry | offset: new_offset})
 
     conn
     |> put_resp_header("upload-offset", to_string(new_offset))
+    |> TusPlug.add_expires_hdr(new_entry.expires_at)
     |> resp(:no_content, "")
   end
 
