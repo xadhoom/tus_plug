@@ -1,4 +1,6 @@
 # Tus
+[![Build Status](https://travis-ci.org/xadhoom/tus_plug.svg?branch=develop)](https://travis-ci.org/xadhoom/tus_plug)
+[![Coverage Status](https://coveralls.io/repos/github/xadhoom/tus_plug/badge.svg?branch=develop)](https://coveralls.io/github/xadhoom/tus_plug?branch=develop)
 
 **TODO: Add description**
 
