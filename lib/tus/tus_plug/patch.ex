@@ -1,10 +1,10 @@
-defmodule Tus.Plug.PATCH do
+defmodule TusPlug.PATCH do
   @moduledoc false
   import Plug.Conn
 
-  @max_body_read Application.get_env(:tus, Tus.Plug)
+  @max_body_read Application.get_env(:tus_plug, TusPlug)
                  |> Keyword.get(:max_body_read)
-  @body_read_len Application.get_env(:tus, Tus.Plug)
+  @body_read_len Application.get_env(:tus_plug, TusPlug)
                  |> Keyword.get(:body_read_len)
 
   def call(%{method: "PATCH"} = conn, opts) do

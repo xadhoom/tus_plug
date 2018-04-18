@@ -10,7 +10,7 @@ by adding `tus` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tus, "~> 0.1.0"}
+    {:tus_plug, "~> 0.1.0"}
   ]
 end
 ```

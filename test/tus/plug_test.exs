@@ -1,15 +1,15 @@
-defmodule Tus.Test.PlugTest do
+defmodule TusPlug.Test do
   @moduledoc false
   use ExUnit.Case, async: true
 
   use Plug.Test
 
-  alias Tus.Plug, as: TusPlug
+  alias TusPlug, as: TusPlug
 
   setup_all do
     on_exit(fn ->
       path =
-        Application.get_env(:tus, Tus.Plug)
+        Application.get_env(:tus_plug, TusPlug)
         |> Keyword.get(:upload_path)
 
       path
@@ -36,8 +36,8 @@ defmodule Tus.Test.PlugTest do
     test "happy path" do
       # fixture
       # create an entry into the cache
-      alias Tus.Plug.Cache
-      alias Tus.Plug.Cache.Entry
+      alias TusPlug.Cache
+      alias TusPlug.Cache.Entry
       tmp_file("stuff") |> File.touch!()
       entry = %Entry{id: "stuff", filename: "stuff", started_at: DateTime.utc_now(), size: 42}
       :ok = Cache.put(entry)
@@ -219,7 +219,7 @@ defmodule Tus.Test.PlugTest do
     end
 
     test "with metadata" do
-      alias Tus.Plug.POST
+      alias TusPlug.POST
 
       postconn =
         conn(:post, "#{upload_baseurl()}")
@@ -276,12 +276,12 @@ defmodule Tus.Test.PlugTest do
   end
 
   defp assert_tus_resumable(conn) do
-    version = Application.get_env(:tus, :version, "1.0.0")
+    version = Application.get_env(:tus_plug, :version, "1.0.0")
     assert version == get_header(conn, "tus-resumable")
   end
 
   defp assert_tus_version(conn) do
-    version = Application.get_env(:tus, :version, "1.0.0")
+    version = Application.get_env(:tus_plug, :version, "1.0.0")
     assert version == get_header(conn, "tus-version")
   end
 
@@ -300,8 +300,8 @@ defmodule Tus.Test.PlugTest do
   end
 
   defp get_tus_max_size do
-    :tus
-    |> Application.get_env(Tus.Plug)
+    :tus_plug
+    |> Application.get_env(TusPlug)
     |> Keyword.get(:max_size)
   end
 
@@ -319,7 +319,7 @@ defmodule Tus.Test.PlugTest do
   end
 
   defp tmp_file(filename) do
-    Application.get_env(:tus, Tus.Plug)
+    Application.get_env(:tus_plug, TusPlug)
     |> Keyword.get(:upload_path)
     |> Path.join(filename)
   end

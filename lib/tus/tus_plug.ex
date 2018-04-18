@@ -1,10 +1,10 @@
-defmodule Tus.Plug do
+defmodule TusPlug do
   @moduledoc """
   Plug implementation for the tus.io protocol
   """
   import Plug.Conn
 
-  alias Tus.Plug.{HEAD, PATCH, POST}
+  alias TusPlug.{HEAD, PATCH, POST}
 
   def init(_opts) do
     %{
@@ -91,21 +91,21 @@ defmodule Tus.Plug do
 
   @doc false
   def upload_path() do
-    :tus
+    :tus_plug
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:upload_path, "/tmp")
   end
 
   @doc false
   def upload_baseurl() do
-    :tus
+    :tus_plug
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:upload_baseurl)
   end
 
   @doc false
   def version() do
-    :tus
+    :tus_plug
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:version, "1.0.0")
   end
@@ -208,7 +208,7 @@ defmodule Tus.Plug do
 
   defp add_max_size_h(conn) do
     max_size =
-      :tus
+      :tus_plug
       |> Application.get_env(__MODULE__)
       |> Keyword.get(:max_size)
 

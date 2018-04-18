@@ -1,6 +1,6 @@
 use Mix.Config
 
-config :tus, Tus.Plug,
+config :tus_plug, TusPlug,
   upload_baseurl: "/files",
   upload_path: "/tmp",
   version: "1.0.0",
@@ -9,7 +9,7 @@ config :tus, Tus.Plug,
   # 4GByte
   max_size: 4_294_967_296
 
-config :tus, Tus.Plug.Cache,
+config :tus_plug, TusPlug.Cache,
   persistence_path: "/tmp",
   ets_backend: PersistentEts
 

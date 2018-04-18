@@ -1,9 +1,10 @@
-defmodule Tus.MixProject do
+defmodule TusPlug.MixProject do
+  @moduledoc false
   use Mix.Project
 
   def project do
     [
-      app: :tus,
+      app: :tus_plug,
       version: "0.1.0",
       elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
@@ -21,7 +22,7 @@ defmodule Tus.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Tus.Application, []}
+      mod: {TusPlug.Application, []}
     ]
   end
 

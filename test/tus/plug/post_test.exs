@@ -1,9 +1,9 @@
-defmodule Tus.Test.Plug.PostTest do
+defmodule TusPlug.Test.TusPlug.PostTest do
   @moduledoc false
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Tus.Plug.POST
+  alias TusPlug.POST
 
   property "valid metadata" do
     check all metadata <- kv_generator() do

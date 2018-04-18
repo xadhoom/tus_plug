@@ -1,4 +1,4 @@
-defmodule Tus.Plug.Cache.Entry do
+defmodule TusPlug.Cache.Entry do
   @moduledoc """
   Structure rapresenting an Entry into the upload cache
   """
@@ -10,11 +10,11 @@ defmodule Tus.Plug.Cache.Entry do
             metadata: nil
 end
 
-defmodule Tus.Plug.Cache do
+defmodule TusPlug.Cache do
   @moduledoc false
   use GenServer
 
-  alias Tus.Plug.Cache.Entry
+  alias TusPlug.Cache.Entry
 
   @table_fname "tus_cache.tab"
 
@@ -66,13 +66,13 @@ defmodule Tus.Plug.Cache do
   end
 
   defp cache_path do
-    Application.get_env(:tus, __MODULE__, [])
+    Application.get_env(:tus_plug, __MODULE__, [])
     |> Keyword.get(:persistence_path, "/tmp")
     |> Path.join(@table_fname)
   end
 
   defp init_cache do
-    Application.get_env(:tus, __MODULE__, [])
+    Application.get_env(:tus_plug, __MODULE__, [])
     |> Keyword.get(:ets_backend, PersistentEts)
     |> case do
       :ets -> :ets.new(__MODULE__, [])

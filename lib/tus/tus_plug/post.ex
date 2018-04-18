@@ -1,9 +1,9 @@
-defmodule Tus.Plug.POST do
+defmodule TusPlug.POST do
   @moduledoc false
   import Plug.Conn
 
-  alias Tus.Plug.Cache
-  alias Tus.Plug.Cache.Entry
+  alias TusPlug.Cache
+  alias TusPlug.Cache.Entry
 
   def call(%{method: "POST"} = conn, opts) do
     with {:ok, upload_len} <- get_upload_len(conn),
@@ -100,8 +100,8 @@ defmodule Tus.Plug.POST do
 
   defp check_upload_len(len) when is_integer(len) do
     hard_len =
-      :tus
-      |> Application.get_env(Tus.Plug, [])
+      :tus_plug
+      |> Application.get_env(TusPlug, [])
       |> Keyword.get(:max_size, 4_294_967_296)
 
     case len do

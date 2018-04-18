@@ -1,9 +1,9 @@
-defmodule Tus.Plug.HEAD do
+defmodule TusPlug.HEAD do
   @moduledoc false
   import Plug.Conn
 
-  alias Tus.Plug.Cache
-  alias Tus.Plug.Cache.Entry
+  alias TusPlug.Cache
+  alias TusPlug.Cache.Entry
 
   def call(%{method: "HEAD"} = conn, opts) do
     #
