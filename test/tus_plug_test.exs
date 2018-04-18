@@ -35,14 +35,7 @@ defmodule TusPlug.Test do
   describe "HEAD" do
     test "happy path" do
       # fixture
-      # create an entry into the cache
-      alias TusPlug.Cache
-      alias TusPlug.Cache.Entry
-      tmp_file("stuff") |> File.touch!()
-
-      :ok =
-        %Entry{id: "stuff", filename: "stuff", started_at: DateTime.utc_now(), size: 42}
-        |> Cache.put()
+      :ok = empty_file_fixture("stuff")
 
       # test
       newconn =
@@ -80,7 +73,7 @@ defmodule TusPlug.Test do
     test "happy path" do
       # fixture
       filename = "patch.happy"
-      filename |> tmp_file() |> File.touch!()
+      :ok = empty_file_fixture(filename)
 
       body = "yadda"
 
@@ -103,7 +96,7 @@ defmodule TusPlug.Test do
     test "multiple requests" do
       # fixture
       filename = "patch.multiple"
-      filename |> tmp_file() |> File.touch!()
+      :ok = empty_file_fixture(filename)
 
       # first segment
       body = "yadda"
@@ -143,7 +136,7 @@ defmodule TusPlug.Test do
     test "conflict" do
       # fixture
       filename = "patch.conflict"
-      filename |> tmp_file() |> File.touch!()
+      :ok = empty_file_fixture(filename)
 
       {:ok, _, _} = upload_chunk(filename, "somedata", "0")
 
@@ -348,5 +341,17 @@ defmodule TusPlug.Test do
       "#{key} #{b64value}"
     end)
     |> Enum.join(",")
+  end
+
+  defp empty_file_fixture(filename) do
+    # fixture
+    # create an entry into the cache
+    alias TusPlug.Cache
+    alias TusPlug.Cache.Entry
+    tmp_file(filename) |> File.touch!()
+
+    :ok =
+      %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: 42}
+      |> Cache.put()
   end
 end

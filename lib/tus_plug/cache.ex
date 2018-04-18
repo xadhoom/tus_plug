@@ -30,6 +30,10 @@ defmodule TusPlug.Cache do
     GenServer.call(__MODULE__, {:get, file_id})
   end
 
+  def update(%Entry{} = entry) do
+    GenServer.call(__MODULE__, {:update, entry})
+  end
+
   def init(_) do
     state = %{
       cache: init_cache()
@@ -61,6 +65,11 @@ defmodule TusPlug.Cache do
   end
 
   def handle_call({:put, %{id: id} = entry}, _from, state) do
+    :ets.insert(state.cache, {id, entry})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:update, %{id: id} = entry}, _from, state) do
     :ets.insert(state.cache, {id, entry})
     {:reply, :ok, state}
   end
