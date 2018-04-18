@@ -29,9 +29,6 @@ defmodule TusPlug.PATCH do
       {:error, :internal_offset_conflict} ->
         conn |> resp(:internal_server_error, "")
 
-      {:error, :gone} ->
-        conn |> resp(:gone, "")
-
       {:error, :offset_conflict} ->
         conn |> resp(:conflict, "")
 
@@ -48,29 +45,42 @@ defmodule TusPlug.PATCH do
   end
 
   defp write_data({:ok, data, conn}, {_, _offset, fd, opts, entry}) do
-    :ok = IO.binwrite(fd, data)
-    File.close(fd)
+    case append_data(fd, data, true) do
+      :ok ->
+        path =
+          conn.private[:filename]
+          |> filepath(opts)
 
-    path =
-      conn.private[:filename]
-      |> filepath(opts)
+        new_offset = path |> File.stat!() |> Map.get(:size)
 
-    new_offset = path |> File.stat!() |> Map.get(:size)
+        {:ok, new_entry} = Cache.update(%{entry | offset: new_offset})
 
-    {:ok, new_entry} = Cache.update(%{entry | offset: new_offset})
+        conn
+        |> put_resp_header("upload-offset", to_string(new_offset))
+        |> TusPlug.add_expires_hdr(new_entry.expires_at)
+        |> resp(:no_content, "")
 
-    conn
-    |> put_resp_header("upload-offset", to_string(new_offset))
-    |> TusPlug.add_expires_hdr(new_entry.expires_at)
-    |> resp(:no_content, "")
+      _ ->
+        Cache.delete(entry)
+
+        conn
+        |> resp(:internal_server_error, "write or close error")
+    end
   end
 
   defp write_data({:more, data, conn}, {_, offset, fd, opts, entry}) do
-    :ok = IO.binwrite(fd, data)
+    case append_data(fd, data, false) do
+      :ok ->
+        conn
+        |> read_body(length: @max_body_read, read_length: @body_read_len)
+        |> write_data({conn, offset, fd, opts, entry})
 
-    conn
-    |> read_body(length: @max_body_read, read_length: @body_read_len)
-    |> write_data({conn, offset, fd, opts, entry})
+      _ ->
+        Cache.delete(entry)
+
+        conn
+        |> resp(:internal_server_error, "write error")
+    end
   end
 
   defp write_data({:error, _err}, {conn, _, _, _, _}) do
@@ -102,7 +112,7 @@ defmodule TusPlug.PATCH do
     Path.join(opts.upload_path, filename)
   end
 
-  defp check_offset(path, offset, %Entry{offset: stored_offset}) do
+  defp check_offset(path, offset, %Entry{offset: stored_offset} = entry) do
     case File.stat(path) do
       {:ok, %{size: ^offset}} ->
         case stored_offset do
@@ -114,7 +124,24 @@ defmodule TusPlug.PATCH do
         {:error, :offset_conflict}
 
       {:error, :enoent} ->
-        {:error, :gone}
+        Cache.delete(entry)
+        {:error, :not_found}
+    end
+  end
+
+  defp append_data(fd, data, false) do
+    case IO.binwrite(fd, data) do
+      :ok -> :ok
+      {:error, _} -> {:error, :write}
+    end
+  end
+
+  defp append_data(fd, data, true) do
+    with :ok <- IO.binwrite(fd, data),
+         :ok <- File.close(fd) do
+      :ok
+    else
+      {:error, _} -> {:error, :write}
     end
   end
 end
