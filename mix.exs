@@ -29,7 +29,8 @@ defmodule Tus.MixProject do
     [
       {:plug, "~> 1.5"},
       {:persistent_ets, "~> 0.1"},
-      # development stuff
+      # development stuff,
+      {:stream_data, "~> 0.4", only: :test},
       {:excoveralls, "~> 0.8", only: :test, runtime: false},
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
       {:credo, "~> 0.8", only: [:dev, :test], runtime: false}
