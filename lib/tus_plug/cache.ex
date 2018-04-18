@@ -38,6 +38,10 @@ defmodule TusPlug.Cache do
     GenServer.call(__MODULE__, {:update, entry})
   end
 
+  def delete(%Entry{} = entry) do
+    GenServer.cast(__MODULE__, {:delete, entry})
+  end
+
   def init(_) do
     state = %{
       cache: init_cache()
@@ -56,6 +60,11 @@ defmodule TusPlug.Cache do
       end
 
     {:reply, res, state}
+  end
+
+  def handle_cast({:delete, %{id: id}}, state) do
+    :ets.delete(state.cache, id)
+    {:noreply, state}
   end
 
   def handle_call({:put, %{id: nil}}, _from, state) do
