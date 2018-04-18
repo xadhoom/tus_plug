@@ -152,7 +152,7 @@ defmodule TusPlug.Test do
 
     test "upload expires" do
       # fixture
-      filename = "patch.multiple"
+      filename = "patch.expires"
       :ok = empty_file_fixture(filename)
 
       # first segment
@@ -322,6 +322,7 @@ defmodule TusPlug.Test do
   end
 
   defp assert_upload_expires(conn) do
+    # TODO check expires format
     assert expires = get_header(conn, "upload-expires")
   end
 
