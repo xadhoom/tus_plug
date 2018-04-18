@@ -39,8 +39,11 @@ defmodule TusPlug.Test do
       alias TusPlug.Cache
       alias TusPlug.Cache.Entry
       tmp_file("stuff") |> File.touch!()
-      entry = %Entry{id: "stuff", filename: "stuff", started_at: DateTime.utc_now(), size: 42}
-      :ok = Cache.put(entry)
+
+      :ok =
+        %Entry{id: "stuff", filename: "stuff", started_at: DateTime.utc_now(), size: 42}
+        |> Cache.put()
+
       # test
       newconn =
         conn(:head, "#{upload_baseurl()}/stuff")
