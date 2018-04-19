@@ -144,6 +144,24 @@ defmodule TusPlug.Test do
       assert newconn2.private[TusPlug.Upload] == expected
     end
 
+    test "exceeds declared size" do
+      # fixture
+      filename = "patch.toomuch"
+      :ok = empty_file_fixture(filename, 6)
+
+      # first segment
+      body = "yadda"
+
+      {:ok, _, res} = upload_chunk(filename, body, "0")
+      assert {204, _headers, _body} = res
+
+      # 2nd segment
+      body2 = "baz"
+
+      {:ok, newconn2, res} = upload_chunk(filename, body2, "5")
+      assert {413, _headers, _body} = res
+    end
+
     test "file does not exists" do
       newconn =
         conn(:patch, "#{upload_baseurl()}/notfound", "body")

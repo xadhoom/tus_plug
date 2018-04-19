@@ -46,38 +46,48 @@ defmodule TusPlug.PATCH do
   end
 
   defp write_data({:ok, data, conn}, {_, _offset, fd, opts, entry}) do
-    case append_data(fd, data, true) do
-      :ok ->
-        {:ok, new_entry} = Cache.update(%{entry | offset: entry.offset + byte_size(data)})
+    if byte_size(data) + entry.offset > entry.size do
+      conn
+      |> resp(:request_entity_too_large, "Size exceeded")
+    else
+      case append_data(fd, data, true) do
+        :ok ->
+          {:ok, new_entry} = Cache.update(%{entry | offset: entry.offset + byte_size(data)})
 
-        conn
-        |> check_completed_upload(new_entry, opts)
-        |> put_resp_header("upload-offset", to_string(new_entry.offset))
-        |> TusPlug.add_expires_hdr(new_entry.expires_at)
-        |> resp(:no_content, "")
+          conn
+          |> check_completed_upload(new_entry, opts)
+          |> put_resp_header("upload-offset", to_string(new_entry.offset))
+          |> TusPlug.add_expires_hdr(new_entry.expires_at)
+          |> resp(:no_content, "")
 
-      _ ->
-        Cache.delete(entry)
+        _ ->
+          Cache.delete(entry)
 
-        conn
-        |> resp(:internal_server_error, "write or close error")
+          conn
+          |> resp(:internal_server_error, "write or close error")
+      end
     end
   end
 
   defp write_data({:more, data, conn}, {_, offset, fd, opts, entry}) do
-    case append_data(fd, data, false) do
-      :ok ->
-        newentry = %{entry | offset: entry.offset + byte_size(data)}
+    if byte_size(data) + entry.offset > entry.size do
+      conn
+      |> resp(:request_entity_too_large, "Size exceeded")
+    else
+      case append_data(fd, data, false) do
+        :ok ->
+          newentry = %{entry | offset: entry.offset + byte_size(data)}
 
-        conn
-        |> read_body(length: @max_body_read, read_length: @body_read_len)
-        |> write_data({conn, offset, fd, opts, newentry})
+          conn
+          |> read_body(length: @max_body_read, read_length: @body_read_len)
+          |> write_data({conn, offset, fd, opts, newentry})
 
-      _ ->
-        Cache.delete(entry)
+        _ ->
+          Cache.delete(entry)
 
-        conn
-        |> resp(:internal_server_error, "write error")
+          conn
+          |> resp(:internal_server_error, "write error")
+      end
     end
   end
 
