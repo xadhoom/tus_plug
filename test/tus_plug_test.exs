@@ -81,7 +81,7 @@ defmodule TusPlug.Test do
         conn(:patch, "#{upload_baseurl()}/#{filename}", body)
         |> put_req_header("upload-offset", "0")
         |> put_req_header("tus-resumable", "1.0.0")
-        |> put_req_header("content-tye", "application/offset+octet-stream")
+        |> put_req_header("content-type", "application/offset+octet-stream")
 
       opts = TusPlug.init([])
       newconn = newconn |> TusPlug.call(opts)
@@ -167,7 +167,7 @@ defmodule TusPlug.Test do
         conn(:patch, "#{upload_baseurl()}/notfound", "body")
         |> put_req_header("upload-offset", "0")
         |> put_req_header("tus-resumable", "1.0.0")
-        |> put_req_header("content-tye", "application/offset+octet-stream")
+        |> put_req_header("content-type", "application/offset+octet-stream")
 
       opts = TusPlug.init([])
       newconn = newconn |> TusPlug.call(opts)
@@ -401,7 +401,7 @@ defmodule TusPlug.Test do
       conn(:patch, "#{upload_baseurl()}/#{filename}", data)
       |> put_req_header("upload-offset", offset)
       |> put_req_header("tus-resumable", "1.0.0")
-      |> put_req_header("content-tye", "application/offset+octet-stream")
+      |> put_req_header("content-type", "application/offset+octet-stream")
 
     opts = TusPlug.init([])
     newconn = newconn |> TusPlug.call(opts)
