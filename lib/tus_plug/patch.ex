@@ -171,7 +171,7 @@ defmodule TusPlug.PATCH do
   defp add_upload_info(conn, entry, opts) do
     path = conn.private[:filename] |> filepath(opts)
 
-    info = %Upload{filename: entry.filename, path: path}
+    info = %Upload{filename: entry.filename, path: path, metadata: entry.metadata}
 
     conn
     |> put_private(TusPlug.Upload, info)

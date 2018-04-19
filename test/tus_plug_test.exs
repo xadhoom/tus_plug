@@ -142,6 +142,45 @@ defmodule TusPlug.Test do
 
       expected = %TusPlug.Upload{filename: filename, path: tmp_file(filename)}
       assert newconn2.private[TusPlug.Upload] == expected
+
+      assert nil == newconn2.private[TusPlug.Upload] |> Map.get(:metadata)
+    end
+
+    test "completed upload, with metadata" do
+      # fixture
+      filename = "patch.completed_with_metadata"
+
+      # create an entry into the cache
+      alias TusPlug.Cache
+      alias TusPlug.Cache.Entry
+      filename |> tmp_file() |> File.touch!()
+
+      {:ok, _} =
+        %Entry{
+          id: filename,
+          filename: filename,
+          started_at: DateTime.utc_now(),
+          size: 8,
+          metadata: [{"foo", "YmFy"}, {"bar", "YmF6"}]
+        }
+        |> Cache.put()
+
+      # first segment
+      body = "yadda"
+
+      {:ok, _, res} = upload_chunk(filename, body, "0")
+      assert {204, _headers, _body} = res
+
+      # 2nd segment
+      body2 = "baz"
+
+      {:ok, newconn2, res} = upload_chunk(filename, body2, "5")
+      assert {204, _headers, _body} = res
+
+      assert %TusPlug.Upload{} = upload_info = newconn2.private[TusPlug.Upload]
+      assert upload_info.filename == filename
+      assert upload_info.path == tmp_file(filename)
+      assert [{"foo", "YmFy"}, {"bar", "YmF6"}] = upload_info.metadata
     end
 
     test "full upload with method override" do

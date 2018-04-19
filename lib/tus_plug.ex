@@ -4,11 +4,12 @@ defmodule TusPlug.Upload do
   """
   @type t :: %{
           filename: binary(),
-          path: binary()
+          path: binary(),
+          metadata: map()
         }
 
   @enforce_keys [:filename, :path]
-  defstruct filename: nil, path: nil
+  defstruct filename: nil, path: nil, metadata: nil
 end
 
 defmodule TusPlug do
