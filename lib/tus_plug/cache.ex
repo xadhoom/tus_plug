@@ -126,7 +126,8 @@ defmodule TusPlug.Cache do
   end
 
   defp expire_entries(state, now) do
-    :ets.tab2list(state.cache)
+    state.cache
+    |> :ets.tab2list()
     |> Enum.filter(fn {_k, entry} ->
       now
       |> DateTime.diff(entry.expires_at, :microsecond)

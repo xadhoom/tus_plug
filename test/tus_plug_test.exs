@@ -158,7 +158,7 @@ defmodule TusPlug.Test do
       # 2nd segment
       body2 = "baz"
 
-      {:ok, newconn2, res} = upload_chunk(filename, body2, "5")
+      {:ok, _, res} = upload_chunk(filename, body2, "5")
       assert {413, _headers, _body} = res
     end
 
@@ -211,7 +211,7 @@ defmodule TusPlug.Test do
         DateTime.utc_now()
         |> Timex.add(Timex.Duration.from_seconds(10))
 
-      GenServer.whereis(TusPlug.Cache) |> send({:expire_timer, future})
+      TusPlug.Cache |> GenServer.whereis() |> send({:expire_timer, future})
 
       # 2nd segment
       body2 = "baz"
@@ -424,7 +424,7 @@ defmodule TusPlug.Test do
     # create an entry into the cache
     alias TusPlug.Cache
     alias TusPlug.Cache.Entry
-    tmp_file(filename) |> File.touch!()
+    filename |> tmp_file() |> File.touch!()
 
     {res, _} =
       %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: size}
