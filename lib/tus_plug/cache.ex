@@ -62,11 +62,6 @@ defmodule TusPlug.Cache do
     {:reply, res, state}
   end
 
-  def handle_cast({:delete, %{id: id}}, state) do
-    :ets.delete(state.cache, id)
-    {:noreply, state}
-  end
-
   def handle_call({:put, %{id: nil}}, _from, state) do
     {:reply, {:error, :id}, state}
   end
@@ -95,6 +90,11 @@ defmodule TusPlug.Cache do
 
     :ets.insert(state.cache, {id, %{entry | expires_at: expires_at}})
     {:reply, {:ok, entry}, state}
+  end
+
+  def handle_cast({:delete, %{id: id}}, state) do
+    :ets.delete(state.cache, id)
+    {:noreply, state}
   end
 
   def handle_info({:expire_timer, now}, state) do
