@@ -43,6 +43,7 @@ defmodule TusPlug.PATCH do
         conn
         |> resp(:internal_server_error, "")
     end
+    |> halt_if_not_completed()
   end
 
   defp write_data({:ok, data, conn}, {_, _offset, fd, opts, entry}) do
@@ -175,5 +176,13 @@ defmodule TusPlug.PATCH do
 
     conn
     |> put_private(TusPlug.Upload, info)
+    |> put_private(TusPlug.Upload.Completed, true)
+  end
+
+  defp halt_if_not_completed(conn) do
+    case conn.private[TusPlug.Upload.Completed] do
+      true -> conn
+      _ -> conn |> halt()
+    end
   end
 end

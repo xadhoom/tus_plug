@@ -30,6 +30,7 @@ defmodule TusPlug.Test do
     conn = TusPlug.call(c, TusPlug.init([]))
 
     assert conn == c
+    refute conn.halted
   end
 
   describe "HEAD" do
@@ -51,6 +52,7 @@ defmodule TusPlug.Test do
       assert_cache_control(newconn)
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert newconn.halted
     end
 
     test "file not found" do
@@ -66,6 +68,7 @@ defmodule TusPlug.Test do
       assert_cache_control(newconn)
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert newconn.halted
     end
   end
 
@@ -94,6 +97,9 @@ defmodule TusPlug.Test do
 
       # upload info should not be there
       refute newconn.private[TusPlug.Upload]
+
+      # not finished, so don't pass on to next plugs
+      assert newconn.halted
     end
 
     test "multiple requests" do
@@ -104,8 +110,9 @@ defmodule TusPlug.Test do
       # first segment
       body = "yadda"
 
-      {:ok, _, res} = upload_chunk(filename, body, "0")
+      {:ok, newconn, res} = upload_chunk(filename, body, "0")
       assert {204, _headers, _body} = res
+      assert newconn.halted
 
       # 2nd segment
       body2 = "baz"
@@ -121,6 +128,8 @@ defmodule TusPlug.Test do
 
       # upload info should not be there
       refute newconn2.private[TusPlug.Upload]
+
+      assert newconn2.halted
     end
 
     test "completed upload" do
@@ -131,8 +140,9 @@ defmodule TusPlug.Test do
       # first segment
       body = "yadda"
 
-      {:ok, _, res} = upload_chunk(filename, body, "0")
+      {:ok, newconn, res} = upload_chunk(filename, body, "0")
       assert {204, _headers, _body} = res
+      assert newconn.halted
 
       # 2nd segment
       body2 = "baz"
@@ -144,6 +154,9 @@ defmodule TusPlug.Test do
       assert newconn2.private[TusPlug.Upload] == expected
 
       assert nil == newconn2.private[TusPlug.Upload] |> Map.get(:metadata)
+
+      # is complete, pass on to next plug
+      refute newconn2.halted
     end
 
     test "completed upload, with metadata" do
@@ -168,8 +181,9 @@ defmodule TusPlug.Test do
       # first segment
       body = "yadda"
 
-      {:ok, _, res} = upload_chunk(filename, body, "0")
+      {:ok, newconn, res} = upload_chunk(filename, body, "0")
       assert {204, _headers, _body} = res
+      assert newconn.halted
 
       # 2nd segment
       body2 = "baz"
@@ -181,6 +195,9 @@ defmodule TusPlug.Test do
       assert upload_info.filename == filename
       assert upload_info.path == tmp_file(filename)
       assert [{"foo", "YmFy"}, {"bar", "YmF6"}] = upload_info.metadata
+
+      # is complete, pass on to next plug
+      refute newconn2.halted
     end
 
     test "full upload with method override" do
@@ -202,6 +219,7 @@ defmodule TusPlug.Test do
       newconn = newconn |> TusPlug.call(opts)
 
       assert {204, _headers, _body} = sent_resp(newconn)
+      assert newconn.halted
 
       # 2nd segment
       body = "baz"
@@ -215,11 +233,13 @@ defmodule TusPlug.Test do
 
       opts = TusPlug.init([])
       newconn2 = newconn2 |> TusPlug.call(opts)
-
       assert {204, _headers, _body} = sent_resp(newconn2)
 
       expected = %TusPlug.Upload{filename: filename, path: tmp_file(filename)}
       assert newconn2.private[TusPlug.Upload] == expected
+
+      # is complete, pass on to next plug
+      refute newconn2.halted
     end
 
     test "exceeds declared size" do
@@ -230,14 +250,17 @@ defmodule TusPlug.Test do
       # first segment
       body = "yadda"
 
-      {:ok, _, res} = upload_chunk(filename, body, "0")
+      {:ok, newconn, res} = upload_chunk(filename, body, "0")
       assert {204, _headers, _body} = res
+      assert newconn.halted
 
       # 2nd segment
       body2 = "baz"
 
-      {:ok, _, res} = upload_chunk(filename, body2, "5")
+      {:ok, newconn, res} = upload_chunk(filename, body2, "5")
       assert {413, _headers, _body} = res
+
+      assert newconn.halted
     end
 
     test "file does not exists" do
@@ -254,6 +277,7 @@ defmodule TusPlug.Test do
 
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert newconn.halted
     end
 
     test "conflict" do
@@ -271,6 +295,7 @@ defmodule TusPlug.Test do
 
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
+      assert newconn2.halted
     end
 
     test "upload expires" do
@@ -283,6 +308,7 @@ defmodule TusPlug.Test do
       {:ok, newconn, res} = upload_chunk(filename, body, "0")
       assert {204, _headers, _body} = res
       assert_upload_expires(newconn)
+      assert newconn.halted
 
       # this is cheating since I rely on an internal message
       future =
@@ -294,8 +320,9 @@ defmodule TusPlug.Test do
       # 2nd segment
       body2 = "baz"
 
-      {:ok, _, res} = upload_chunk(filename, body2, "5")
+      {:ok, conn, res} = upload_chunk(filename, body2, "5")
       assert {404, _headers, _body} = res
+      assert conn.halted
     end
   end
 
@@ -315,6 +342,7 @@ defmodule TusPlug.Test do
       assert_tus_extensions(newconn)
       assert_tus_location(newconn)
       assert_upload_expires(newconn)
+      assert newconn.halted
     end
 
     test "wrong path" do
@@ -330,6 +358,7 @@ defmodule TusPlug.Test do
 
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert newconn.halted
     end
 
     test "missing upload-length" do
@@ -344,6 +373,7 @@ defmodule TusPlug.Test do
 
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert newconn.halted
     end
 
     test "413 too large" do
@@ -361,6 +391,7 @@ defmodule TusPlug.Test do
 
       assert {413, _headers, _body} = sent_resp(newconn)
       assert_tus_max_size(newconn)
+      assert newconn.halted
     end
 
     test "with metadata" do
@@ -376,6 +407,7 @@ defmodule TusPlug.Test do
       postconn = postconn |> TusPlug.call(opts)
 
       assert {201, _headers, _body} = sent_resp(postconn)
+      assert postconn.halted
 
       loc = get_header(postconn, "location")
 
@@ -389,6 +421,7 @@ defmodule TusPlug.Test do
 
       assert metadata = get_header(headconn, "upload-metadata")
       assert {:ok, _} = POST.validate_metadata(metadata)
+      assert headconn.halted
     end
   end
 
@@ -404,6 +437,7 @@ defmodule TusPlug.Test do
       assert_tus_version(newconn)
       assert_tus_extensions(newconn)
       assert_tus_max_size(newconn)
+      assert newconn.halted
     end
   end
 

@@ -53,6 +53,7 @@ defmodule TusPlug do
       {:error, :nomatch} ->
         conn
     end
+    |> halt()
     |> do_response()
   end
 
@@ -73,6 +74,7 @@ defmodule TusPlug do
       {:error, :precondition} ->
         conn |> resp(:precondition_failed, "")
     end
+    |> halt()
     |> do_response()
   end
 
@@ -117,6 +119,7 @@ defmodule TusPlug do
       {:error, :precondition} ->
         conn |> resp(:precondition_failed, "")
     end
+    |> halt()
     |> do_response()
   end
 
@@ -157,7 +160,6 @@ defmodule TusPlug do
     |> add_version_h()
     |> add_extensions_h()
     |> add_max_size_h()
-    |> halt()
     |> send_resp()
   end
 
