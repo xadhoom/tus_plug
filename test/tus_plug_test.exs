@@ -91,6 +91,9 @@ defmodule TusPlug.Test do
       assert_upload_offset(newconn, body |> byte_size() |> to_string())
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+
+      # upload info should not be there
+      refute newconn.private[TusPlug.Upload]
     end
 
     test "multiple requests" do
@@ -115,6 +118,30 @@ defmodule TusPlug.Test do
       assert body <> body2 == File.read!(tmp_file(filename))
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
+
+      # upload info should not be there
+      refute newconn2.private[TusPlug.Upload]
+    end
+
+    test "completed upload" do
+      # fixture
+      filename = "patch.completed"
+      :ok = empty_file_fixture(filename, 8)
+
+      # first segment
+      body = "yadda"
+
+      {:ok, _, res} = upload_chunk(filename, body, "0")
+      assert {204, _headers, _body} = res
+
+      # 2nd segment
+      body2 = "baz"
+
+      {:ok, newconn2, res} = upload_chunk(filename, body2, "5")
+      assert {204, _headers, _body} = res
+
+      expected = %TusPlug.Upload{filename: filename, path: tmp_file(filename)}
+      assert newconn2.private[TusPlug.Upload] == expected
     end
 
     test "file does not exists" do
@@ -322,8 +349,8 @@ defmodule TusPlug.Test do
   end
 
   defp assert_upload_expires(conn) do
-    # TODO check expires format
     assert expires = get_header(conn, "upload-expires")
+    assert Timex.parse!(expires, "{WDshort}, {0D} {Mshort} {YYYY} {h24}:{m}:{s} GMT")
   end
 
   defp get_tus_max_size do
@@ -374,7 +401,7 @@ defmodule TusPlug.Test do
     |> Enum.join(",")
   end
 
-  defp empty_file_fixture(filename) do
+  defp empty_file_fixture(filename, size \\ 42) do
     # fixture
     # create an entry into the cache
     alias TusPlug.Cache
@@ -382,7 +409,7 @@ defmodule TusPlug.Test do
     tmp_file(filename) |> File.touch!()
 
     {res, _} =
-      %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: 42}
+      %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: size}
       |> Cache.put()
 
     res

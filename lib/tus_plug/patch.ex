@@ -2,6 +2,7 @@ defmodule TusPlug.PATCH do
   @moduledoc false
   import Plug.Conn
 
+  alias TusPlug.Upload
   alias TusPlug.Cache
   alias TusPlug.Cache.Entry
 
@@ -47,16 +48,11 @@ defmodule TusPlug.PATCH do
   defp write_data({:ok, data, conn}, {_, _offset, fd, opts, entry}) do
     case append_data(fd, data, true) do
       :ok ->
-        path =
-          conn.private[:filename]
-          |> filepath(opts)
-
-        new_offset = path |> File.stat!() |> Map.get(:size)
-
-        {:ok, new_entry} = Cache.update(%{entry | offset: new_offset})
+        {:ok, new_entry} = Cache.update(%{entry | offset: entry.offset + byte_size(data)})
 
         conn
-        |> put_resp_header("upload-offset", to_string(new_offset))
+        |> check_completed_upload(new_entry, opts)
+        |> put_resp_header("upload-offset", to_string(new_entry.offset))
         |> TusPlug.add_expires_hdr(new_entry.expires_at)
         |> resp(:no_content, "")
 
@@ -71,9 +67,11 @@ defmodule TusPlug.PATCH do
   defp write_data({:more, data, conn}, {_, offset, fd, opts, entry}) do
     case append_data(fd, data, false) do
       :ok ->
+        newentry = %{entry | offset: entry.offset + byte_size(data)}
+
         conn
         |> read_body(length: @max_body_read, read_length: @body_read_len)
-        |> write_data({conn, offset, fd, opts, entry})
+        |> write_data({conn, offset, fd, opts, newentry})
 
       _ ->
         Cache.delete(entry)
@@ -143,5 +141,29 @@ defmodule TusPlug.PATCH do
     else
       {:error, _} -> {:error, :write}
     end
+  end
+
+  defp check_completed_upload(conn, entry, opts) do
+    offset = entry.offset
+
+    case entry.size do
+      ^offset ->
+        Cache.delete(entry)
+
+        conn
+        |> add_upload_info(entry, opts)
+
+      _ ->
+        conn
+    end
+  end
+
+  defp add_upload_info(conn, entry, opts) do
+    path = conn.private[:filename] |> filepath(opts)
+
+    info = %Upload{filename: entry.filename, path: path}
+
+    conn
+    |> put_private(TusPlug.Upload, info)
   end
 end

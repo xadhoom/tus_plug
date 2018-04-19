@@ -1,3 +1,16 @@
+defmodule TusPlug.Upload do
+  @moduledoc """
+  Holds details of a completed upload
+  """
+  @type t :: %{
+          filename: binary(),
+          path: binary()
+        }
+
+  @enforce_keys [:filename, :path]
+  defstruct filename: nil, path: nil
+end
+
 defmodule TusPlug do
   @moduledoc """
   Plug implementation for the tus.io protocol
@@ -112,8 +125,12 @@ defmodule TusPlug do
 
   @doc false
   def add_expires_hdr(conn, %DateTime{} = dt) do
+    {:ok, expires} =
+      dt
+      |> Timex.format("{WDshort}, {0D} {Mshort} {YYYY} {h24}:{m}:{s} GMT")
+
     conn
-    |> put_resp_header("upload-expires", to_string(dt))
+    |> put_resp_header("upload-expires", expires)
   end
 
   defp do_response(%{state: :set} = conn) do
