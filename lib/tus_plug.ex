@@ -19,6 +19,8 @@ defmodule TusPlug do
 
   alias TusPlug.{HEAD, PATCH, POST}
 
+  @methods ["OPTIONS", "HEAD", "PATCH", "POST"]
+
   def init(_opts) do
     %{
       upload_path: upload_path(),
@@ -26,7 +28,21 @@ defmodule TusPlug do
     }
   end
 
-  def call(%{method: "OPTIONS"} = conn, opts) do
+  def call(%{method: meth} = conn, opts) when meth in @methods do
+    case get_req_header(conn, "x-http-method-override") do
+      [] ->
+        call_impl(conn, opts)
+
+      [wants_method] when wants_method in @methods ->
+        call_impl(%{conn | method: wants_method}, opts)
+    end
+  end
+
+  def call(conn, _) do
+    conn
+  end
+
+  defp call_impl(%{method: "OPTIONS"} = conn, opts) do
     with {:ok, conn} <- check_path(conn, opts) do
       conn
       |> add_version_h()
@@ -39,7 +55,7 @@ defmodule TusPlug do
     |> do_response()
   end
 
-  def call(%{method: "HEAD"} = conn, opts) do
+  defp call_impl(%{method: "HEAD"} = conn, opts) do
     with {:ok, conn} <- check_path(conn, opts),
          {:ok, conn} <- preconditions(conn, opts),
          {:ok, conn} <- extract_filename(conn, opts) do
@@ -59,7 +75,7 @@ defmodule TusPlug do
     |> do_response()
   end
 
-  def call(%{method: "PATCH"} = conn, opts) do
+  defp call_impl(%{method: "PATCH"} = conn, opts) do
     with :ok <- check_content_type(conn),
          {:ok, conn} <- check_path(conn, opts),
          {:ok, conn} <- preconditions(conn, opts),
@@ -84,7 +100,7 @@ defmodule TusPlug do
     |> do_response()
   end
 
-  def call(%{method: "POST"} = conn, opts) do
+  defp call_impl(%{method: "POST"} = conn, opts) do
     with {:ok, conn} <- check_path(conn, opts),
          {:ok, conn} <- preconditions(conn, opts),
          {:error, _} <- extract_filename(conn, opts) do
@@ -101,10 +117,6 @@ defmodule TusPlug do
         conn |> resp(:precondition_failed, "")
     end
     |> do_response()
-  end
-
-  def call(conn, _) do
-    conn
   end
 
   @doc false

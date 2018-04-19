@@ -144,6 +144,45 @@ defmodule TusPlug.Test do
       assert newconn2.private[TusPlug.Upload] == expected
     end
 
+    test "full upload with method override" do
+      # fixture
+      filename = "patch.override"
+      :ok = empty_file_fixture(filename, 8)
+
+      # first segment
+      body = "yadda"
+
+      newconn =
+        conn(:post, "#{upload_baseurl()}/#{filename}", body)
+        |> put_req_header("upload-offset", "0")
+        |> put_req_header("x-http-method-override", "PATCH")
+        |> put_req_header("tus-resumable", "1.0.0")
+        |> put_req_header("content-type", "application/offset+octet-stream")
+
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {204, _headers, _body} = sent_resp(newconn)
+
+      # 2nd segment
+      body = "baz"
+
+      newconn2 =
+        conn(:post, "#{upload_baseurl()}/#{filename}", body)
+        |> put_req_header("upload-offset", "5")
+        |> put_req_header("x-http-method-override", "PATCH")
+        |> put_req_header("tus-resumable", "1.0.0")
+        |> put_req_header("content-type", "application/offset+octet-stream")
+
+      opts = TusPlug.init([])
+      newconn2 = newconn2 |> TusPlug.call(opts)
+
+      assert {204, _headers, _body} = sent_resp(newconn2)
+
+      expected = %TusPlug.Upload{filename: filename, path: tmp_file(filename)}
+      assert newconn2.private[TusPlug.Upload] == expected
+    end
+
     test "exceeds declared size" do
       # fixture
       filename = "patch.toomuch"
