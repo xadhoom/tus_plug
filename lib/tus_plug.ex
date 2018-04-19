@@ -60,12 +60,17 @@ defmodule TusPlug do
   end
 
   def call(%{method: "PATCH"} = conn, opts) do
-    with {:ok, conn} <- check_path(conn, opts),
+    with :ok <- check_content_type(conn),
+         {:ok, conn} <- check_path(conn, opts),
          {:ok, conn} <- preconditions(conn, opts),
          {:ok, conn} <- extract_filename(conn, opts) do
       conn
       |> PATCH.call(opts)
     else
+      {:error, :content_type} ->
+        conn
+        |> resp(:bad_request, "")
+
       {:error, :nomatch} ->
         conn
 
@@ -241,5 +246,15 @@ defmodule TusPlug do
 
   defp extensions do
     "creation,expiration"
+  end
+
+  defp check_content_type(conn) do
+    # checks for application/offset+octet-stream
+    conn
+    |> get_req_header("content-type")
+    |> case do
+      ["application/offset+octet-stream"] -> :ok
+      _ -> {:error, :content_type}
+    end
   end
 end
