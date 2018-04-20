@@ -1,4 +1,4 @@
-# Tus
+# TusPlug
 [![Build Status](https://travis-ci.org/xadhoom/tus_plug.svg?branch=develop)](https://travis-ci.org/xadhoom/tus_plug)
 [![Coverage Status](https://coveralls.io/repos/github/xadhoom/tus_plug/badge.svg?branch=develop)](https://coveralls.io/github/xadhoom/tus_plug?branch=develop)
 
@@ -7,7 +7,7 @@
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `tus` to your list of dependencies in `mix.exs`:
+by adding `tus_plug` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -19,5 +19,5 @@ end
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/tus](https://hexdocs.pm/tus).
+be found at [https://hexdocs.pm/tus](https://hexdocs.pm/tus_plug).
 
