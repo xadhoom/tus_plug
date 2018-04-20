@@ -53,7 +53,8 @@ defmodule TusPlug.PATCH do
     else
       case append_data(fd, data, true) do
         :ok ->
-          {:ok, new_entry} = Cache.update(%{entry | offset: entry.offset + byte_size(data)})
+          {:ok, new_entry} =
+            Cache.update(%{entry | offset: entry.offset + byte_size(data)})
 
           conn
           |> check_completed_upload(new_entry, opts)
@@ -172,7 +173,11 @@ defmodule TusPlug.PATCH do
   defp add_upload_info(conn, entry, opts) do
     path = conn.private[:filename] |> filepath(opts)
 
-    info = %Upload{filename: entry.filename, path: path, metadata: entry.metadata}
+    info = %Upload{
+      filename: entry.filename,
+      path: path,
+      metadata: entry.metadata
+    }
 
     conn
     |> put_private(TusPlug.Upload, info)

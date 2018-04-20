@@ -121,7 +121,11 @@ defmodule TusPlug.Test do
       assert {204, _headers, _body} = res
 
       # checks
-      assert_upload_offset(newconn2, (body <> body2) |> byte_size() |> to_string())
+      assert_upload_offset(
+        newconn2,
+        (body <> body2) |> byte_size() |> to_string()
+      )
+
       assert body <> body2 == File.read!(tmp_file(filename))
       assert_tus_resumable(newconn2)
       assert_tus_extensions(newconn2)
@@ -442,7 +446,8 @@ defmodule TusPlug.Test do
   end
 
   defp assert_tus_location(conn) do
-    assert get_header(conn, "location") =~ ~r/#{upload_baseurl()}\/[a-z|0-9]{32}$/
+    assert get_header(conn, "location") =~
+             ~r/#{upload_baseurl()}\/[a-z|0-9]{32}$/
   end
 
   defp assert_tus_extensions(conn) do
@@ -480,7 +485,11 @@ defmodule TusPlug.Test do
 
   defp assert_upload_expires(conn) do
     assert expires = get_header(conn, "upload-expires")
-    assert Timex.parse!(expires, "{WDshort}, {0D} {Mshort} {YYYY} {h24}:{m}:{s} GMT")
+
+    assert Timex.parse!(
+             expires,
+             "{WDshort}, {0D} {Mshort} {YYYY} {h24}:{m}:{s} GMT"
+           )
   end
 
   defp get_tus_max_size do
@@ -539,7 +548,12 @@ defmodule TusPlug.Test do
     filename |> tmp_file() |> File.touch!()
 
     {res, _} =
-      %Entry{id: filename, filename: filename, started_at: DateTime.utc_now(), size: size}
+      %Entry{
+        id: filename,
+        filename: filename,
+        started_at: DateTime.utc_now(),
+        size: size
+      }
       |> Cache.put()
 
     res
