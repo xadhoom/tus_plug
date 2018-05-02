@@ -25,7 +25,7 @@ defmodule TusPlug.Test do
     :ok
   end
 
-  test "not matching path just returns conn" do
+  test "not matching path just returns conn and proceeds to next plug" do
     c = conn(:get, "/foo/var")
     conn = TusPlug.call(c, TusPlug.init([]))
 
@@ -159,8 +159,9 @@ defmodule TusPlug.Test do
 
       assert nil == newconn2.private[TusPlug.Upload] |> Map.get(:metadata)
 
-      # is complete, pass on to next plug
-      refute newconn2.halted
+      # is complete, stop plug chain and calls callback
+      assert newconn2.halted
+      assert_receive {:uploaded, ^expected}
     end
 
     test "completed upload, with metadata" do
@@ -200,8 +201,9 @@ defmodule TusPlug.Test do
       assert upload_info.path == tmp_file(filename)
       assert [{"foo", "YmFy"}, {"bar", "YmF6"}] = upload_info.metadata
 
-      # is complete, pass on to next plug
-      refute newconn2.halted
+      # is complete, plug chain is stopped and complete callback is called
+      assert newconn2.halted
+      assert_receive {:uploaded, ^upload_info}
     end
 
     test "full upload with method override" do
@@ -235,15 +237,68 @@ defmodule TusPlug.Test do
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-type", "application/offset+octet-stream")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(on_complete: fn x -> send(self(), {:uploaded, x}) end)
       newconn2 = newconn2 |> TusPlug.call(opts)
       assert {204, _headers, _body} = sent_resp(newconn2)
 
       expected = %TusPlug.Upload{filename: filename, path: tmp_file(filename)}
       assert newconn2.private[TusPlug.Upload] == expected
 
-      # is complete, pass on to next plug
-      refute newconn2.halted
+      # is complete, stop plug chain and calls callback
+      assert newconn2.halted
+      assert_receive {:uploaded, ^expected}
+    end
+
+    test "completed upload with no success callback" do
+      # fixture
+      filename = "patch.no_callback"
+      :ok = empty_file_fixture(filename, 5)
+
+      # first segment
+      body = "yadda"
+
+      newconn =
+        conn(:patch, "#{upload_baseurl()}/#{filename}", body)
+        |> put_req_header("upload-offset", "0")
+        |> put_req_header("tus-resumable", "1.0.0")
+        |> put_req_header("content-type", "application/offset+octet-stream")
+
+      # no callback here
+      opts = TusPlug.init([])
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {204, _headers, _body} = sent_resp(newconn)
+      assert newconn.halted
+    end
+
+    test "completed upload with MFA success callback" do
+      # fixture
+      filename = "patch.mfa_callback"
+      :ok = empty_file_fixture(filename, 5)
+
+      # first segment
+      body = "yadda"
+
+      newconn =
+        conn(:patch, "#{upload_baseurl()}/#{filename}", body)
+        |> put_req_header("upload-offset", "0")
+        |> put_req_header("tus-resumable", "1.0.0")
+        |> put_req_header("content-type", "application/offset+octet-stream")
+
+      defmodule CallBack do
+        @moduledoc false
+        def success(data, pid) when is_pid(pid) do
+          send(pid, {:from_callback, data})
+        end
+      end
+
+      opts = TusPlug.init(on_complete: {CallBack, :success, [self()]})
+      newconn = newconn |> TusPlug.call(opts)
+      expected = newconn.private[TusPlug.Upload]
+
+      assert {204, _headers, _body} = sent_resp(newconn)
+      assert newconn.halted
+      assert_receive {:from_callback, ^expected}, 5000
     end
 
     test "exceeds declared size" do
@@ -524,7 +579,8 @@ defmodule TusPlug.Test do
       |> put_req_header("tus-resumable", "1.0.0")
       |> put_req_header("content-type", "application/offset+octet-stream")
 
-    opts = TusPlug.init([])
+    opts = TusPlug.init(on_complete: fn x -> send(self(), {:uploaded, x}) end)
+
     newconn = newconn |> TusPlug.call(opts)
 
     res = sent_resp(newconn)

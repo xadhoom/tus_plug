@@ -22,11 +22,15 @@ defmodule TusPlug do
 
   @methods ["OPTIONS", "HEAD", "PATCH", "POST"]
 
-  def init(_opts) do
-    %{
+  def init(opts) when is_list(opts) do
+    paths = %{
       upload_path: upload_path(),
       upload_baseurl: upload_baseurl()
     }
+
+    opts
+    |> Map.new()
+    |> Map.merge(paths)
   end
 
   def call(%{method: meth} = conn, opts) when meth in @methods do

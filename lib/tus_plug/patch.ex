@@ -43,7 +43,7 @@ defmodule TusPlug.PATCH do
         conn
         |> resp(:internal_server_error, "")
     end
-    |> halt_if_not_completed()
+    |> maybe_completed(opts)
   end
 
   defp write_data({:ok, data, conn}, {_, _offset, fd, opts, entry}) do
@@ -184,10 +184,34 @@ defmodule TusPlug.PATCH do
     |> put_private(TusPlug.Upload.Completed, true)
   end
 
-  defp halt_if_not_completed(conn) do
+  defp maybe_completed(conn, opts) do
     case conn.private[TusPlug.Upload.Completed] do
-      true -> conn
-      _ -> conn |> halt()
+      true ->
+        on_completed(conn, opts)
+        conn |> halt()
+
+      _ ->
+        conn |> halt()
     end
+  end
+
+  defp on_completed(conn, opts) do
+    upload_data = conn.private[TusPlug.Upload]
+
+    opts
+    |> Map.get(:on_complete)
+    |> call_completed_cb(upload_data)
+  end
+
+  defp call_completed_cb(nil, _) do
+    :ok
+  end
+
+  defp call_completed_cb(function, upload_data) when is_function(function, 1) do
+    function.(upload_data)
+  end
+
+  defp call_completed_cb({module, function, args}, upload_data) do
+    apply(module, function, [upload_data | args])
   end
 end
