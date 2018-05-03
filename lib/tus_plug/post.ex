@@ -7,7 +7,7 @@ defmodule TusPlug.POST do
 
   def call(%{method: "POST"} = conn, opts) do
     with {:ok, upload_len} <- get_upload_len(conn),
-         :ok <- check_upload_len(upload_len),
+         :ok <- check_upload_len(upload_len, opts),
          {:ok, location, entry} <- create(conn, opts) do
       conn
       |> put_resp_header("location", location)
@@ -105,11 +105,8 @@ defmodule TusPlug.POST do
     end
   end
 
-  defp check_upload_len(len) when is_integer(len) do
-    hard_len =
-      :tus_plug
-      |> Application.get_env(TusPlug, [])
-      |> Keyword.get(:max_size, 4_294_967_296)
+  defp check_upload_len(len, opts) when is_integer(len) do
+    hard_len = opts.max_size
 
     case len do
       v when v > hard_len -> {:error, :max_size}

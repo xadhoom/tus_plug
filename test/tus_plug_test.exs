@@ -5,18 +5,24 @@ defmodule TusPlug.Test do
   use Plug.Test
 
   alias TusPlug, as: TusPlug
+  alias TusPlug.Config
+
+  @upload_path "test/fixtures"
 
   setup_all do
-    on_exit(fn ->
-      path =
-        Application.get_env(:tus_plug, TusPlug)
-        |> Keyword.get(:upload_path)
+    Application.put_env(
+      :tus_plug,
+      TusPlug.Cache,
+      persistence_path: "/tmp",
+      ets_backend: :ets
+    )
 
-      path
+    on_exit(fn ->
+      @upload_path
       |> File.ls!()
       |> Enum.filter(fn file -> file != ".gitignore" end)
       |> Enum.each(fn file ->
-        path
+        @upload_path
         |> Path.join(file)
         |> File.rm!()
       end)
@@ -27,7 +33,7 @@ defmodule TusPlug.Test do
 
   test "not matching path just returns conn and proceeds to next plug" do
     c = conn(:get, "/foo/var")
-    conn = TusPlug.call(c, TusPlug.init([]))
+    conn = TusPlug.call(c, TusPlug.init(default_args()))
 
     assert conn == c
     refute conn.halted
@@ -43,7 +49,7 @@ defmodule TusPlug.Test do
         conn(:head, "#{upload_baseurl()}/stuff")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {200, _headers, _body} = sent_resp(newconn)
@@ -60,7 +66,7 @@ defmodule TusPlug.Test do
         conn(:head, "#{upload_baseurl()}/yadda.gz")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
@@ -86,7 +92,7 @@ defmodule TusPlug.Test do
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-type", "application/offset+octet-stream")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {204, _headers, _body} = sent_resp(newconn)
@@ -221,7 +227,7 @@ defmodule TusPlug.Test do
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-type", "application/offset+octet-stream")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {204, _headers, _body} = sent_resp(newconn)
@@ -237,7 +243,11 @@ defmodule TusPlug.Test do
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-type", "application/offset+octet-stream")
 
-      opts = TusPlug.init(on_complete: fn x -> send(self(), {:uploaded, x}) end)
+      args =
+        default_args()
+        |> Keyword.merge(on_complete: fn x -> send(self(), {:uploaded, x}) end)
+
+      opts = TusPlug.init(args)
       newconn2 = newconn2 |> TusPlug.call(opts)
       assert {204, _headers, _body} = sent_resp(newconn2)
 
@@ -264,7 +274,7 @@ defmodule TusPlug.Test do
         |> put_req_header("content-type", "application/offset+octet-stream")
 
       # no callback here
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {204, _headers, _body} = sent_resp(newconn)
@@ -292,7 +302,11 @@ defmodule TusPlug.Test do
         end
       end
 
-      opts = TusPlug.init(on_complete: {CallBack, :success, [self()]})
+      args =
+        default_args()
+        |> Keyword.merge(on_complete: {CallBack, :success, [self()]})
+
+      opts = TusPlug.init(args)
       newconn = newconn |> TusPlug.call(opts)
       expected = newconn.private[TusPlug.Upload]
 
@@ -329,7 +343,7 @@ defmodule TusPlug.Test do
         |> put_req_header("tus-resumable", "1.0.0")
         |> put_req_header("content-type", "application/offset+octet-stream")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
@@ -392,7 +406,7 @@ defmodule TusPlug.Test do
         |> put_req_header("upload-length", "42")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {201, _headers, _body} = sent_resp(newconn)
@@ -410,7 +424,7 @@ defmodule TusPlug.Test do
         |> put_req_header("upload-length", "42")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {404, _headers, _body} = sent_resp(newconn)
@@ -425,7 +439,7 @@ defmodule TusPlug.Test do
         conn(:post, "#{upload_baseurl()}")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {412, _headers, _body} = sent_resp(newconn)
@@ -445,7 +459,7 @@ defmodule TusPlug.Test do
         |> put_req_header("upload-length", "#{len}")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {413, _headers, _body} = sent_resp(newconn)
@@ -462,7 +476,7 @@ defmodule TusPlug.Test do
         |> put_req_header("upload-metadata", gen_metadata())
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       postconn = postconn |> TusPlug.call(opts)
 
       assert {201, _headers, _body} = sent_resp(postconn)
@@ -474,7 +488,7 @@ defmodule TusPlug.Test do
         conn(:head, loc)
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       headconn = headconn |> TusPlug.call(opts)
       assert {200, _headers, _body} = sent_resp(headconn)
 
@@ -488,7 +502,7 @@ defmodule TusPlug.Test do
     test "options" do
       newconn = conn(:options, "#{upload_baseurl()}")
 
-      opts = TusPlug.init([])
+      opts = TusPlug.init(default_args())
       newconn = newconn |> TusPlug.call(opts)
 
       assert {204, _headers, _body} = sent_resp(newconn)
@@ -515,13 +529,11 @@ defmodule TusPlug.Test do
   end
 
   defp assert_tus_resumable(conn) do
-    version = Application.get_env(:tus_plug, :version, "1.0.0")
-    assert version == get_header(conn, "tus-resumable")
+    assert "1.0.0" == get_header(conn, "tus-resumable")
   end
 
   defp assert_tus_version(conn) do
-    version = Application.get_env(:tus_plug, :version, "1.0.0")
-    assert version == get_header(conn, "tus-version")
+    assert "1.0.0" == get_header(conn, "tus-version")
   end
 
   defp assert_upload_offset(conn, value \\ 0) do
@@ -548,9 +560,8 @@ defmodule TusPlug.Test do
   end
 
   defp get_tus_max_size do
-    :tus_plug
-    |> Application.get_env(TusPlug)
-    |> Keyword.get(:max_size)
+    %Config{}
+    |> Map.get(:max_size)
   end
 
   defp get_header(conn, header) do
@@ -563,12 +574,12 @@ defmodule TusPlug.Test do
   end
 
   defp upload_baseurl do
-    TusPlug.upload_baseurl()
+    %Config{}
+    |> Map.get(:upload_baseurl)
   end
 
   defp tmp_file(filename) do
-    Application.get_env(:tus_plug, TusPlug)
-    |> Keyword.get(:upload_path)
+    @upload_path
     |> Path.join(filename)
   end
 
@@ -579,7 +590,11 @@ defmodule TusPlug.Test do
       |> put_req_header("tus-resumable", "1.0.0")
       |> put_req_header("content-type", "application/offset+octet-stream")
 
-    opts = TusPlug.init(on_complete: fn x -> send(self(), {:uploaded, x}) end)
+    args =
+      default_args()
+      |> Keyword.merge(on_complete: fn x -> send(self(), {:uploaded, x}) end)
+
+    opts = TusPlug.init(args)
 
     newconn = newconn |> TusPlug.call(opts)
 
@@ -601,17 +616,26 @@ defmodule TusPlug.Test do
     # create an entry into the cache
     alias TusPlug.Cache
     alias TusPlug.Cache.Entry
-    filename |> tmp_file() |> File.touch!()
+    fullpath = filename |> tmp_file()
+    fullpath |> File.touch!()
 
     {res, _} =
       %Entry{
         id: filename,
-        filename: filename,
+        filename: fullpath,
         started_at: DateTime.utc_now(),
         size: size
       }
       |> Cache.put()
 
     res
+  end
+
+  defp default_args do
+    [
+      upload_path: "test/fixtures",
+      max_body_read: 2,
+      body_read_len: 1
+    ]
   end
 end

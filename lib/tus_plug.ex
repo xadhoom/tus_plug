@@ -18,19 +18,15 @@ defmodule TusPlug do
   """
   import Plug.Conn
 
-  alias TusPlug.{HEAD, PATCH, POST}
+  alias TusPlug.{HEAD, PATCH, POST, Config}
 
   @methods ["OPTIONS", "HEAD", "PATCH", "POST"]
 
   def init(opts) when is_list(opts) do
-    paths = %{
-      upload_path: upload_path(),
-      upload_baseurl: upload_baseurl()
-    }
+    opts_map = Map.new(opts)
 
-    opts
-    |> Map.new()
-    |> Map.merge(paths)
+    %Config{}
+    |> Map.merge(opts_map)
   end
 
   def call(%{method: meth} = conn, opts) when meth in @methods do
@@ -50,7 +46,7 @@ defmodule TusPlug do
   defp call_impl(%{method: "OPTIONS"} = conn, opts) do
     with {:ok, conn} <- check_path(conn, opts) do
       conn
-      |> add_version_h()
+      |> add_version_h(opts)
       |> add_extensions_h()
       |> resp(:no_content, "")
     else
@@ -58,7 +54,7 @@ defmodule TusPlug do
         conn
     end
     |> halt()
-    |> do_response()
+    |> do_response(opts)
   end
 
   defp call_impl(%{method: "HEAD"} = conn, opts) do
@@ -79,7 +75,7 @@ defmodule TusPlug do
         conn |> resp(:precondition_failed, "")
     end
     |> halt()
-    |> do_response()
+    |> do_response(opts)
   end
 
   defp call_impl(%{method: "PATCH"} = conn, opts) do
@@ -104,7 +100,7 @@ defmodule TusPlug do
       {:error, :precondition} ->
         conn |> resp(:precondition_failed, "")
     end
-    |> do_response()
+    |> do_response(opts)
   end
 
   defp call_impl(%{method: "POST"} = conn, opts) do
@@ -124,28 +120,12 @@ defmodule TusPlug do
         conn |> resp(:precondition_failed, "")
     end
     |> halt()
-    |> do_response()
+    |> do_response(opts)
   end
 
   @doc false
-  def upload_path() do
-    :tus_plug
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:upload_path, "/tmp")
-  end
-
-  @doc false
-  def upload_baseurl() do
-    :tus_plug
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:upload_baseurl)
-  end
-
-  @doc false
-  def version() do
-    :tus_plug
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:version, "1.0.0")
+  def version(opts) do
+    opts.version
   end
 
   @doc false
@@ -158,21 +138,21 @@ defmodule TusPlug do
     |> put_resp_header("upload-expires", expires)
   end
 
-  defp do_response(%{state: :set} = conn) do
+  defp do_response(%{state: :set} = conn, opts) do
     conn
-    |> put_resp_header("tus-resumable", version())
-    |> add_version_h()
+    |> put_resp_header("tus-resumable", version(opts))
+    |> add_version_h(opts)
     |> add_extensions_h()
-    |> add_max_size_h()
+    |> add_max_size_h(opts)
     |> send_resp()
   end
 
-  defp do_response(conn) do
+  defp do_response(conn, _opts) do
     conn
   end
 
-  defp preconditions(conn, _opts) do
-    myversion = version()
+  defp preconditions(conn, opts) do
+    myversion = version(opts)
 
     conn
     |> get_req_header("tus-resumable")
@@ -243,9 +223,9 @@ defmodule TusPlug do
     |> filename()
   end
 
-  defp add_version_h(conn) do
+  defp add_version_h(conn, opts) do
     conn
-    |> put_resp_header("tus-version", version())
+    |> put_resp_header("tus-version", version(opts))
   end
 
   defp add_extensions_h(conn) do
@@ -253,14 +233,9 @@ defmodule TusPlug do
     |> put_resp_header("tus-extension", extensions())
   end
 
-  defp add_max_size_h(conn) do
-    max_size =
-      :tus_plug
-      |> Application.get_env(__MODULE__)
-      |> Keyword.get(:max_size)
-
+  defp add_max_size_h(conn, opts) do
     conn
-    |> put_resp_header("tus-max-size", to_string(max_size))
+    |> put_resp_header("tus-max-size", to_string(opts.max_size))
   end
 
   defp extensions do

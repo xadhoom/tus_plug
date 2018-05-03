@@ -1,6 +1,6 @@
 defmodule TusPlug.Cache.Entry do
   @moduledoc """
-  Structure rapresenting an Entry into the upload cache
+  Structure rapresenting an Entry into the upload cache.
   """
   defstruct id: nil,
             filename: nil,
@@ -12,7 +12,14 @@ defmodule TusPlug.Cache.Entry do
 end
 
 defmodule TusPlug.Cache do
-  @moduledoc false
+  @moduledoc """
+  If PersistentEts path or ttl needs to be adjusted,
+  just set Application vars as:
+
+    config :tus_plug, TusPlug.Cache,
+      persistence_path: "/tmp",
+      ttl: 5000
+  """
   use GenServer
 
   alias Timex.Duration
@@ -138,9 +145,8 @@ defmodule TusPlug.Cache do
     end)
     |> Enum.each(fn {k, entry} ->
       Logger.info(fn -> "Removing cache entry #{inspect(entry)}" end)
-      file = Path.join(TusPlug.upload_path(), entry.filename)
 
-      case File.rm(file) do
+      case File.rm(entry.filename) do
         :ok -> :ets.delete(state.cache, k)
         err -> Logger.error("Could not remove cache entry: #{inspect(err)}")
       end

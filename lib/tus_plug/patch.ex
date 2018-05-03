@@ -6,11 +6,6 @@ defmodule TusPlug.PATCH do
   alias TusPlug.Cache
   alias TusPlug.Cache.Entry
 
-  @max_body_read Application.get_env(:tus_plug, TusPlug)
-                 |> Keyword.get(:max_body_read)
-  @body_read_len Application.get_env(:tus_plug, TusPlug)
-                 |> Keyword.get(:body_read_len)
-
   def call(%{method: "PATCH"} = conn, opts) do
     filename = conn.private[:filename]
     path = filepath(filename, opts)
@@ -21,7 +16,7 @@ defmodule TusPlug.PATCH do
          {:ok, _} <- File.stat(path),
          {:ok, fd} <- File.open(path, [:append]) do
       conn
-      |> read_body(length: @max_body_read, read_length: @body_read_len)
+      |> read_body(length: opts.max_body_read, read_length: opts.body_read_len)
       |> write_data({conn, offset, fd, opts, entry})
     else
       {:error, :offset} ->
@@ -81,7 +76,10 @@ defmodule TusPlug.PATCH do
           newentry = %{entry | offset: entry.offset + byte_size(data)}
 
           conn
-          |> read_body(length: @max_body_read, read_length: @body_read_len)
+          |> read_body(
+            length: opts.max_body_read,
+            read_length: opts.body_read_len
+          )
           |> write_data({conn, offset, fd, opts, newentry})
 
         _ ->
@@ -174,7 +172,7 @@ defmodule TusPlug.PATCH do
     path = conn.private[:filename] |> filepath(opts)
 
     info = %Upload{
-      filename: entry.filename,
+      filename: entry.id,
       path: path,
       metadata: entry.metadata
     }
