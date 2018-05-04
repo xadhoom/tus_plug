@@ -32,7 +32,7 @@ defmodule TusPlug.POST do
 
     location =
       "#{conn.scheme}://#{conn.host}:#{conn.port}"
-      |> URI.merge(Path.join(opts.upload_baseurl, fileid))
+      |> URI.merge(Path.join(conn.request_path, fileid))
       |> to_string
 
     case get_metadata(conn) do

@@ -18,7 +18,7 @@ defmodule TusPlug do
   """
   import Plug.Conn
 
-  alias TusPlug.{HEAD, PATCH, POST, Config}
+  alias TusPlug.{HEAD, PATCH, POST, Config, UrlHelper}
 
   @methods ["OPTIONS", "HEAD", "PATCH", "POST"]
 
@@ -44,25 +44,27 @@ defmodule TusPlug do
   end
 
   defp call_impl(%{method: "OPTIONS"} = conn, opts) do
-    with {:ok, conn} <- check_path(conn, opts) do
+    with {:ok, _} <- UrlHelper.validate(conn, opts) do
       conn
       |> add_version_h(opts)
       |> add_extensions_h()
       |> resp(:no_content, "")
+      |> halt()
+      |> do_response(opts)
     else
       {:error, :nomatch} ->
         conn
     end
-    |> halt()
-    |> do_response(opts)
   end
 
   defp call_impl(%{method: "HEAD"} = conn, opts) do
-    with {:ok, conn} <- check_path(conn, opts),
+    with {:ok, _, _} <- UrlHelper.validate(conn, opts),
          {:ok, conn} <- preconditions(conn, opts),
          {:ok, conn} <- extract_filename(conn, opts) do
       conn
       |> HEAD.call(opts)
+      |> halt()
+      |> do_response(opts)
     else
       {:error, :nomatch} ->
         conn
@@ -70,25 +72,30 @@ defmodule TusPlug do
       {:error, :nofile} ->
         conn
         |> resp(:bad_request, "")
+        |> halt()
+        |> do_response(opts)
 
       {:error, :precondition} ->
-        conn |> resp(:precondition_failed, "")
+        conn
+        |> resp(:precondition_failed, "")
+        |> halt()
+        |> do_response(opts)
     end
-    |> halt()
-    |> do_response(opts)
   end
 
   defp call_impl(%{method: "PATCH"} = conn, opts) do
-    with :ok <- check_content_type(conn),
-         {:ok, conn} <- check_path(conn, opts),
+    with {:ok, _, _} <- UrlHelper.validate(conn, opts),
+         :ok <- check_content_type(conn),
          {:ok, conn} <- preconditions(conn, opts),
          {:ok, conn} <- extract_filename(conn, opts) do
       conn
       |> PATCH.call(opts)
+      |> do_response(opts)
     else
       {:error, :content_type} ->
         conn
         |> resp(:bad_request, "")
+        |> do_response(opts)
 
       {:error, :nomatch} ->
         conn
@@ -96,31 +103,38 @@ defmodule TusPlug do
       {:error, :nofile} ->
         conn
         |> resp(:bad_request, "")
+        |> do_response(opts)
 
       {:error, :precondition} ->
-        conn |> resp(:precondition_failed, "")
+        conn
+        |> resp(:precondition_failed, "")
+        |> do_response(opts)
     end
-    |> do_response(opts)
   end
 
   defp call_impl(%{method: "POST"} = conn, opts) do
-    with {:ok, conn} <- check_path(conn, opts),
-         {:ok, conn} <- preconditions(conn, opts),
-         {:error, _} <- extract_filename(conn, opts) do
+    with {:ok, _} <- UrlHelper.validate(conn, opts),
+         {:ok, conn} <- preconditions(conn, opts) do
       conn
       |> POST.call(opts)
+      |> halt()
+      |> do_response(opts)
     else
       {:error, :nomatch} ->
         conn
 
-      {:ok, _} ->
-        conn |> resp(:not_found, "")
+      {:error, :not_found} ->
+        conn
+        |> resp(:not_found, "")
+        |> halt()
+        |> do_response(opts)
 
       {:error, :precondition} ->
-        conn |> resp(:precondition_failed, "")
+        conn
+        |> resp(:precondition_failed, "")
+        |> halt()
+        |> do_response(opts)
     end
-    |> halt()
-    |> do_response(opts)
   end
 
   @doc false
@@ -162,22 +176,6 @@ defmodule TusPlug do
 
       _ ->
         {:error, :precondition}
-    end
-  end
-
-  defp check_path(conn, opts) do
-    path_info = basepath(conn.path_info)
-
-    baseurl =
-      ["" | path_info]
-      |> Enum.join("/")
-
-    case opts.upload_baseurl do
-      ^baseurl ->
-        {:ok, conn}
-
-      _ ->
-        {:error, :nomatch}
     end
   end
 

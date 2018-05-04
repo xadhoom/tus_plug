@@ -31,12 +31,96 @@ defmodule TusPlug.Test do
     :ok
   end
 
-  test "not matching path just returns conn and proceeds to next plug" do
-    c = conn(:get, "/foo/var")
-    conn = TusPlug.call(c, TusPlug.init(default_args()))
+  describe "not matching abs path is ignored" do
+    test "GET" do
+      c = conn(:get, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(default_args()))
 
-    assert conn == c
-    refute conn.halted
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "POST" do
+      c = conn(:post, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(default_args()))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "HEAD" do
+      c = conn(:heade, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(default_args()))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "OPTIONS" do
+      c = conn(:options, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(default_args()))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "PATCH" do
+      c = conn(:patch, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(default_args()))
+
+      assert conn == c
+      refute conn.halted
+    end
+  end
+
+  describe "not matching relative path is ignored" do
+    setup do
+      args = default_args() |> Keyword.merge(upload_baseurl: "files")
+
+      {:ok, %{args: args}}
+    end
+
+    test "GET", %{args: _args} do
+      c = conn(:get, "/foo/var")
+      args = default_args() |> Keyword.merge(upload_baseurl: "files")
+
+      conn = TusPlug.call(c, TusPlug.init(args))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "POST", %{args: args} do
+      c = conn(:post, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(args))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "HEAD", %{args: args} do
+      c = conn(:head, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(args))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "OPTIONS", %{args: args} do
+      c = conn(:options, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(args))
+
+      assert conn == c
+      refute conn.halted
+    end
+
+    test "PATCH", %{args: args} do
+      c = conn(:patch, "/foo/var")
+      conn = TusPlug.call(c, TusPlug.init(args))
+
+      assert conn == c
+      refute conn.halted
+    end
   end
 
   describe "HEAD" do
@@ -418,20 +502,50 @@ defmodule TusPlug.Test do
       assert newconn.halted
     end
 
-    test "wrong path" do
+    test "happy multilevel path" do
+      long_path = "/something/files"
+
       newconn =
-        conn(:post, "#{upload_baseurl()}/foo")
+        conn(:post, long_path)
         |> put_req_header("upload-length", "42")
         |> put_req_header("tus-resumable", "1.0.0")
 
-      opts = TusPlug.init(default_args())
+      args = default_args() |> Keyword.merge(upload_baseurl: long_path)
+      opts = TusPlug.init(args)
       newconn = newconn |> TusPlug.call(opts)
 
-      assert {404, _headers, _body} = sent_resp(newconn)
+      assert {201, _headers, _body} = sent_resp(newconn)
 
       assert_tus_resumable(newconn)
       assert_tus_extensions(newconn)
+      assert_upload_expires(newconn)
       assert newconn.halted
+
+      location = assert_tus_location(newconn)
+      assert location =~ ~r/\/something\/files\/[a-z|0-9]{32}$/
+    end
+
+    test "happy relative path" do
+      long_path = "/something/files"
+
+      newconn =
+        conn(:post, long_path)
+        |> put_req_header("upload-length", "42")
+        |> put_req_header("tus-resumable", "1.0.0")
+
+      args = default_args() |> Keyword.merge(upload_baseurl: "files")
+      opts = TusPlug.init(args)
+      newconn = newconn |> TusPlug.call(opts)
+
+      assert {201, _headers, _body} = sent_resp(newconn)
+
+      assert_tus_resumable(newconn)
+      assert_tus_extensions(newconn)
+      assert_upload_expires(newconn)
+      assert newconn.halted
+
+      location = assert_tus_location(newconn)
+      assert location =~ ~r/\/something\/files\/[a-z|0-9]{32}$/
     end
 
     test "missing upload-length" do
@@ -517,6 +631,8 @@ defmodule TusPlug.Test do
   defp assert_tus_location(conn) do
     assert get_header(conn, "location") =~
              ~r/#{upload_baseurl()}\/[a-z|0-9]{32}$/
+
+    get_header(conn, "location")
   end
 
   defp assert_tus_extensions(conn) do
