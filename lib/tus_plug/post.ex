@@ -35,13 +35,15 @@ defmodule TusPlug.POST do
       |> URI.merge(Path.join(conn.request_path, fileid))
       |> to_string
 
+    {:ok, upload_len} = get_upload_len(conn)
+
     case get_metadata(conn) do
       {:ok, md} ->
         {:ok, entry} =
           %Entry{
             id: fileid,
             filename: path,
-            size: get_upload_len(conn),
+            size: upload_len,
             started_at: DateTime.utc_now(),
             metadata: md
           }
@@ -86,7 +88,7 @@ defmodule TusPlug.POST do
 
     split
     |> Enum.all?(fn kv ->
-      kv =~ ~r/^[a-z|A-Z|0-9]+ [a-z|A-Z|0-9|=|\/|\+]+$/
+      kv =~ ~r/^[a-z|A-Z|0-9|.|-|_]+ [a-z|A-Z|0-9|=|\/|\+]+$/
     end)
     |> case do
       false ->
