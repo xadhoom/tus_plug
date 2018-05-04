@@ -148,7 +148,9 @@ defmodule TusPlug.Cache do
 
       case File.rm(entry.filename) do
         :ok -> :ets.delete(state.cache, k)
-        err -> Logger.error("Could not remove cache entry: #{inspect(err)}")
+        err ->
+          Logger.error("Could not remove file cache entry: #{inspect(err)}")
+          :ets.delete(state.cache, k)
       end
     end)
   end
