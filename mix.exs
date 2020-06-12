@@ -29,7 +29,7 @@ defmodule TusPlug.MixProject do
   defp deps do
     [
       {:plug, "~> 1.5"},
-      {:persistent_ets, "~> 0.1"},
+      {:persistent_ets, "~> 0.2"},
       {:timex, "~> 3.2"},
       # development stuff,
       {:stream_data, "~> 0.4", only: :test},
